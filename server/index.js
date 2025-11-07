@@ -18,6 +18,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
+      "https://localhost:5173",
       "https://koursify.vercel.app", // MY VERCEL-FRONTEND URL
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
