@@ -1,7 +1,7 @@
 import {createApi, fetchBaseQuery} from "@reduxjs/toolkit/query/react"
 import { loginUser } from "../auth/authSlice.js";
 
-const Base_USER_AUTH_API = "http://koursify-backend.onrender.com/api/user/";
+const Base_USER_AUTH_API = "https://koursify-backend.onrender.com/api/user/";
 
 export const authApi = createApi({
     reducerPath:"authApi",
