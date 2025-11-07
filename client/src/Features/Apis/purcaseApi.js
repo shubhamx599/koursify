@@ -1,7 +1,7 @@
 // client/src/Features/Apis/purcaseApi.js
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-const BASE_USER_COURSE_PURCHASE_API = "http://localhost:5000/api/purchase/";
+const BASE_USER_COURSE_PURCHASE_API = "http://koursify-backend.onrender.com/api/purchase/";
 
 export const purchaseApi = createApi({
     reducerPath: "purchaseApi",
