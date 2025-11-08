@@ -1,224 +1,153 @@
+// server/Controllers/AuthController.js
 const userModel = require("../Modles/userModel.js");
 const bcrypt = require("bcryptjs");
-const { generateToken } = require("../utils/Jwttoken.js");
-const {deleteMedia,uploadMedia} = require("../utils/cloudinary.js")
+const jwt = require("jsonwebtoken");
 
 const register = async (req, res) => {
-    try {
-        const { email, password,role} = req.body;
+  try {
+    const { email, password, role } = req.body;
 
-        // Log incoming request data
-        console.log("Request body:", req.body);
-
-        // Validate required fields
-        if (!email || !password) {
-            console.log("Missing required fields");
-            return res.status(400).json({
-                success: false,
-                message: "All fields are required. ✋",
-            });
-        }
-        // Validate if user already exists
-        const user = await userModel.findOne({ email });
-        console.log("User found in database:", user);
-        if (user) {
-            return res.status(400).json({
-                success: false,
-                message: "User already exists with this email. 👤",
-            });
-        }
-
-      
-
-     const hashedPassword = await bcrypt.hash(password, 10);
-        console.log("Password hashed:", hashedPassword);
-
-        // Create the user
-        const newUser = await userModel.create({
-            email,
-            password: hashedPassword,
-            role,
-        });
-        console.log("New user created:", newUser);
-
-        // Success response
-        return res.status(201).json({
-            success: true,
-            message: "Account created successfully! 🎉",
-            user: {
-                id: newUser._id,
-                email: newUser.email,
-                role,
-            },
-        });
-    } catch (e) {
-        console.error("Error during registration:", e);
-        res.status(500).json({
-            success: false,
-            message: "Something went wrong on our end. Please try again later. 🛠️",
-        });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
     }
-};
 
+    const user = await userModel.findOne({ email });
+    if (user) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists with this email.",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await userModel.create({
+      email,
+      password: hashedPassword,
+      role: role || "student",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Account created successfully!",
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
+  } catch (e) {
+    console.error("Registration error:", e);
+    res.status(500).json({
+      success: false,
+      message: "Server error. Please try again.",
+    });
+  }
+};
 
 const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-        // Log incoming request data
-        console.log("Request body:", req.body);
-
-        // Validate required fields
-        if (!email || !password) {
-            console.log("Missing required fields");
-            return res.status(400).json({
-                success: false,
-                message: "All fields are required. ✋",
-            });
-        }
-
-        // Log email lookup
-        console.log("Looking up user with email:", email);
-        const user = await userModel.findOne({ email });
-        if (!user) {
-            console.log("User not found in database");
-            return res.status(400).json({
-                success: false,
-                message: "User does not exist with these credentials. 👤",
-            });
-        }
-
-        // Log password comparison
-        console.log("Comparing passwords for user:", user.email);
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
-        if (!isPasswordMatch) {
-            console.log("Password does not match for user:", user.email);
-            return res.status(400).json({
-                success: false,
-                message: "Invalid credentials 👤",
-            });
-        }
-        console.log("Login successful for user:", user.email);
-        generateToken(res, user, `Welcome back ${user.email[0]}`);
-
-    } catch (e) {
-        console.log("Error during login:", e);
-        res.status(500).json({
-            success: false,
-            message: "Something went wrong on our end. Please try again later. 🛠️",
-        });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
     }
+
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    // ✅ FIXED: Use JWT_SECRET (not JWT_SECRET_KEY)
+    const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_KEY;
+
+    if (!jwtSecret) {
+      return res.status(500).json({
+        success: false,
+        message: "Server configuration error",
+      });
+    }
+
+    const token = jwt.sign({ id: user._id }, jwtSecret, {
+      expiresIn: "7d",
+    });
+
+    // ✅ SIMPLIFIED RESPONSE - Remove cookie complexity
+    return res.status(200).json({
+      success: true,
+      message: `Welcome back ${user.email}`,
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+      },
+      token: token,
+    });
+  } catch (e) {
+    console.error("Login error:", e);
+    res.status(500).json({
+      success: false,
+      message: "Server error. Please try again.",
+    });
+  }
 };
 
-const logout = (_,res) =>{
-    try{
-
-        return res.status(200).cookie("token","",{maxAge:0}).json({
-            message:"Logged out successfully",
-            success:true,
-        }) 
-
-    }catch(e){
-        console.log("Error during login:", e);
-        res.status(500).json({
-            success: false,
-            message: "Something went wrong on our end. Please try again later. 🛠️"
-    }
-)}
-}
+const logout = (req, res) => {
+  try {
+    return res.status(200).json({
+      message: "Logged out successfully",
+      success: true,
+    });
+  } catch (e) {
+    console.error("Logout error:", e);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 
 const getUserProfile = async (req, res) => {
-    try {
-        const userId = req.tokenId;
-        const user = await userModel
-            .findById(userId)
-            .select("-password")
-            .populate({
-                path: "enrolledCourses",
-                populate: {
-                    path: "creator", 
-                    select: "name email photoUrl", 
-                },
-            });
+  try {
+    const userId = req.userId; // ✅ FIXED: Changed from tokenId to userId
 
-        if (!user) {
-            return res.status(404).json({
-                message: "Profile not found",
-                success: false,
-            });
-        }
+    const user = await userModel.findById(userId).select("-password");
 
-        return res.status(200).json({
-            message: "Profile found",
-            success: true,
-            user,
-        });
-
-    } catch (e) {
-        console.error("Error fetching profile:", e);
-        res.status(500).json({
-            message: "Error in getting profile",
-            success: false,
-        });
+    if (!user) {
+      return res.status(404).json({
+        message: "Profile not found",
+        success: false,
+      });
     }
+
+    return res.status(200).json({
+      message: "Profile found",
+      success: true,
+      user,
+    });
+  } catch (e) {
+    console.error("Profile error:", e);
+    res.status(500).json({
+      message: "Error fetching profile",
+      success: false,
+    });
+  }
 };
 
-const editProfile = async (req, res) => {
-    try {
-        const userId = req.tokenId;
-        const { name } = req.body;
-        const profilePhoto = req.file;
-
-        const user = await userModel.findById(userId);
-        if (!user) {
-            return res.status(404).json({
-                message: "Profile not found",
-                success: false,
-            });
-        }
-
-        let photoUrl = user.photoUrl;
-
-        if (profilePhoto) {
-            // Delete old profile picture if it exists
-            if (user.photoUrl) {
-                const publicId = user.photoUrl.split("/").pop().split(".")[0]; 
-                await deleteMedia(publicId);
-            }
-
-            // Upload new image
-            const response = await uploadMedia(profilePhoto.buffer);
-            photoUrl = response.secure_url;
-            console.log("New profile picture uploaded:", photoUrl);
-        }
-
-        // Prepare updated data
-        const updatedData = { name };
-        if (photoUrl) updatedData.photoUrl = photoUrl;
-
-        // Update the user
-        const updatedUser = await userModel.findByIdAndUpdate(userId, updatedData, {
-            new: true,
-        }).select("-password");
-
-        return res.status(200).json({
-            success: true,
-            updatedUser,
-            message: "Profile updated successfully",
-        });
-
-    } catch (error) {
-        console.error("Error in editing profile:", error);
-        res.status(500).json({
-            message: "Error in editing profile",
-            success: false,
-            error: error.message,
-        });
-    }
-};
-
-
-
-
-
-module.exports = {register,login,getUserProfile,logout,editProfile};
+module.exports = { register, login, getUserProfile, logout };

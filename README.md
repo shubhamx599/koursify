@@ -1,5 +1,3 @@
-
-```
 koursify
 ├─ client
 │  ├─ components.json
@@ -111,7 +109,6 @@ koursify
    │  └─ purchaseController.js
    ├─ index.js
    ├─ MIddlewares
-   │  ├─ AuthMiddleware.js
    │  └─ isAuthenticated.js
    ├─ Modles
    │  ├─ Course.js
@@ -119,6 +116,8 @@ koursify
    │  ├─ lecture.js
    │  ├─ progress.js
    │  └─ userModel.js
+   ├─ package-lock.json
+   ├─ package.json
    ├─ Routes
    │  ├─ AuthRoute.js
    │  ├─ CourseRoute.js
@@ -130,5 +129,3 @@ koursify
       ├─ Jwttoken.js
       ├─ multer.js
       └─ razorpay.js
-
-```

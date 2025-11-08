@@ -1,7 +1,12 @@
+// client/src/App.jsx
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { loginUser, setLoading } from "./Features/auth/authSlice";
 import "./App.css";
 import "./index.css";
 import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import { ThemeProvider } from "./components/theme-provider";
 import HomePage from "./Pages/Student/HomePage.jsx";
@@ -19,20 +24,103 @@ import EditLecture from "./Pages/Admin/EditLecture.jsx";
 import CourseDetail from "./Pages/Student/CourseDetail.jsx";
 import CourseProgress from "./Pages/Student/CourseProgress.jsx";
 import SearchPage from "./Pages/Student/searchPage.jsx";
-import { Authenticated, ProtectedRoute, AdminRoute } from "./AppComonents/Commom/ProtectedRoutes.jsx";
+import {
+  Authenticated,
+  ProtectedRoute,
+  AdminRoute,
+} from "./AppComonents/Commom/ProtectedRoutes.jsx";
 
 function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    // Check authentication status on app load
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+
+    console.log("🔍 [APP] Checking auth on load...");
+    console.log("🔍 [APP] Token found:", !!token);
+    console.log("🔍 [APP] User found:", !!user);
+
+    if (token && token !== "undefined" && token !== "null" && user) {
+      try {
+        const userData = JSON.parse(user);
+        console.log("🔍 [APP] Dispatching loginUser with data:", userData);
+
+        dispatch(
+          loginUser({
+            user: userData,
+            token: token,
+          })
+        );
+
+        console.log("✅ [APP] User authenticated successfully");
+      } catch (error) {
+        console.error("❌ [APP] Error parsing user data:", error);
+        // Clear invalid data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        console.log("🧹 [APP] Cleared invalid auth data");
+      }
+    } else {
+      console.log("🔍 [APP] No valid auth data found");
+      // Clear any invalid tokens
+      if (token === "undefined" || token === "null") {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    }
+
+    dispatch(setLoading(false));
+    console.log("✅ [APP] Auth check completed");
+  }, [dispatch]);
+
   const router = createBrowserRouter([
     {
       path: "/",
       element: <HeroPage />,
       children: [
         { path: "/", element: <HomePage /> },
-        { path: "my-learning", element: <ProtectedRoute><MyLearning /></ProtectedRoute> },
-        { path: "my-profile", element: <ProtectedRoute><Profile /></ProtectedRoute> },
-        { path: "course/search", element: <ProtectedRoute><SearchPage /></ProtectedRoute> },
-        { path: "detail-page/:courseId", element: <ProtectedRoute><CourseDetail /></ProtectedRoute> },
-        { path: "course-progress/:courseId", element: <ProtectedRoute><CourseProgress /></ProtectedRoute> },
+        {
+          path: "my-learning",
+          element: (
+            <ProtectedRoute>
+              <MyLearning />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "my-profile",
+          element: (
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "course/search",
+          element: (
+            <ProtectedRoute>
+              <SearchPage />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "detail-page/:courseId",
+          element: (
+            <ProtectedRoute>
+              <CourseDetail />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "course-progress/:courseId",
+          element: (
+            <ProtectedRoute>
+              <CourseProgress />
+            </ProtectedRoute>
+          ),
+        },
       ],
     },
     {
@@ -56,7 +144,10 @@ function App() {
         { path: "add-course/create-course", element: <AddCourse /> },
         { path: "add-course/:courseId", element: <EditCourse /> },
         { path: "add-course/:courseId/lectures", element: <LecturePage /> },
-        { path: "add-course/:courseId/lectures/:lectureId/edit", element: <EditLecture /> },
+        {
+          path: "add-course/:courseId/lectures/:lectureId/edit",
+          element: <EditLecture />,
+        },
       ],
     },
   ]);

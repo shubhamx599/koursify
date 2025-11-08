@@ -1,40 +1,35 @@
+// client/src/AppComonents/Commom/ProtectedRoutes.jsx - COMPLETE REPLACE
 import { useSelector } from "react-redux";
 import { Navigate, Outlet } from "react-router-dom";
 
-// Simple loading spinner component
 const LoadingSpinner = () => (
-  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-    <div className="spinner">Loading...</div>
+  <div className="flex justify-center items-center h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
   </div>
 );
 
 export const ProtectedRoute = ({ children }) => {
-  const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
+  const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
 
-  // Show loading spinner while checking authentication state
+  // ✅ Check localStorage directly as fallback
+  const token = localStorage.getItem("token");
+
   if (isLoading) return <LoadingSpinner />;
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !token) {
     return <Navigate to="/auth" replace />;
-  }
-
-  if (user?.role === "instructor") {
-    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return children || <Outlet />;
 };
 
 export const Authenticated = ({ children }) => {
-  const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
+  const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
+  const token = localStorage.getItem("token");
 
-  // Show loading spinner while checking authentication state
   if (isLoading) return <LoadingSpinner />;
 
-  if (isAuthenticated) {
-    if (user.role === "instructor") {
-      return <Navigate to="/admin/dashboard" replace />;
-    }
+  if (isAuthenticated || token) {
     return <Navigate to="/" replace />;
   }
 
@@ -42,14 +37,18 @@ export const Authenticated = ({ children }) => {
 };
 
 export const AdminRoute = ({ children }) => {
-  const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
+  const { user, isAuthenticated, isLoading } = useSelector(
+    (state) => state.auth
+  );
+  const token = localStorage.getItem("token");
 
-  // Show loading spinner while checking authentication state
   if (isLoading) return <LoadingSpinner />;
 
- 
+  if (!isAuthenticated || !token) {
+    return <Navigate to="/auth" replace />;
+  }
 
-  if (!user || user.role !== "instructor") {
+  if (user?.role !== "instructor") {
     return <Navigate to="/" replace />;
   }
 

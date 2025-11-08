@@ -21,7 +21,7 @@ const Auth = () => {
             <div className="w-full h-screen relative flex items-center justify-center ml-12">
               <div className="md:px-14 px-2 tracking-[20px]  bg-gray-600/5 backdrop-blur-sm rounded-full hidden lg:flex select-none  sm:justify-center sm:items-center ">
                 <h1 className="text-[5vh] lg:text-[18vh] text-gray-700 bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text">
-                  Lectur
+                  Koursify
                 </h1>
               </div>
             </div>

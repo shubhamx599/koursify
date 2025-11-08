@@ -49,7 +49,7 @@ const GlassNavbar = () => {
         {/* Logo */}
         <Link to="/">
           <h3 className=" bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo text-lg md:text-xl lg:text-2xl font-semibold  leading-loose flex items-center cursor-pointer mt-1 ">
-            L E C T U R
+            K O U R S I F Y
           </h3>
         </Link>
 

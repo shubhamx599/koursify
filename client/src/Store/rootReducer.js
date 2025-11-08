@@ -1,3 +1,4 @@
+// client/src/Store/rootReducer.js
 import { combineReducers } from "@reduxjs/toolkit";
 import authReducer from "../Features/auth/authSlice.js"
 import { authApi } from "../Features/Apis/authApi.js";
