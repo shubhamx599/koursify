@@ -247,4 +247,49 @@ const editProfile = async (req, res) => {
     }
 };
 
-module.exports = { register, login, getUserProfile, logout, editProfile };
+const switchRole = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+                success: false,
+            });
+        }
+
+        const newRole = user.role === "instructor" ? "student" : "instructor";
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { role: newRole },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                photoUrl: true,
+                photoPublicId: true
+            }
+        });
+
+        const userWithMongoId = {
+            ...updatedUser,
+            _id: updatedUser.id
+        };
+
+        return res.status(200).json({
+            success: true,
+            user: userWithMongoId,
+            message: `Switched to ${newRole} account successfully`,
+        });
+    } catch (error) {
+        console.error("❌ Error switching role:", error);
+        res.status(500).json({
+            message: "Error switching role",
+            success: false,
+            error: error.message,
+        });
+    }
+};
+
+module.exports = { register, login, getUserProfile, logout, editProfile, switchRole };
