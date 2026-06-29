@@ -1,13 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const BASE_USER_COURSE_API = "https://koursify-backend.onrender.com/api/course/";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { createAuthenticatedBaseQuery } from "./baseQuery.js";
 
 export const courseApi = createApi({
     reducerPath: "courseApi",
-    baseQuery: fetchBaseQuery({
-        baseUrl: BASE_USER_COURSE_API,
-        credentials: "include"
-    }),
+    baseQuery: createAuthenticatedBaseQuery("course"),
     endpoints: (builder) => ({
         createCourse: builder.mutation({
             query: ({ courseTitle, category }) => ({

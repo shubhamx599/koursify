@@ -1,17 +1,13 @@
-import React from 'react'
-import GlassNavbar from '../Commom/Navbar.jsx'
-import { Outlet } from 'react-router-dom'
+import { Outlet } from "react-router-dom";
+import GlassNavbar from "../Commom/Navbar.jsx";
 
-const HeroPage = () => {
-  return (
-    <div className='grid-background flex flex-col'>
+const HeroPage = () => (
+  <div className="site-shell">
+    <GlassNavbar />
+    <main className="pt-[92px] md:pt-[108px]">
+      <Outlet />
+    </main>
+  </div>
+);
 
-        <GlassNavbar/>
-        <div className='flex flex-col w-full mt-2 '>
-            <Outlet/>
-        </div>
-    </div>
-  )
-}
-
-export default HeroPage
+export default HeroPage;

@@ -1,133 +1,43 @@
-import CourseTable from '@/AppComonents/Admin/CourseTable'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import React, { useEffect, useState } from 'react'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Button } from '@/components/ui/button'
-import { Link, useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
-import { useCreateCourseMutation, useGetCourseQuery } from '@/Features/Apis/courseApi'
-import { toast } from 'react-toastify'; // Import toast
-import 'react-toastify/dist/ReactToastify.css';
+import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCreateCourseMutation, useGetCourseQuery } from "@/Features/Apis/courseApi";
 
+const categoryGroups = [
+  { label: "Web development", courses: ["HTML", "CSS", "JavaScript", "React", "Vue.js", "Next.js"] },
+  { label: "Data & AI", courses: ["Python", "SQL", "Machine Learning", "Pandas"] },
+  { label: "Backend", courses: ["Node.js", "Django", "Spring Boot", "GoLang"] },
+  { label: "Cloud", courses: ["AWS", "Azure", "Google Cloud", "Kubernetes"] },
+  { label: "Security", courses: ["Ethical Hacking", "Network Security"] },
+];
 
 const AddCourse = () => {
   const navigate = useNavigate();
-  const {refetch} = useGetCourseQuery();
- 
-  const [courseTitle,setCourseTitle] = useState();
-  const [category,setCategory] = useState();
-  const [createCourse,{data,isLoading, error,isSuccess}] = useCreateCourseMutation();
+  const { refetch } = useGetCourseQuery();
+  const [courseTitle, setCourseTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [createCourse, { data, isLoading, error, isSuccess }] = useCreateCourseMutation();
 
-  const createCourseHandler  =  async()=>{
-    await createCourse({
-      courseTitle,category
-    })
-
-  }
   useEffect(() => {
-    if (isSuccess) {
-      toast.success(data?.message || "Course added successfully", {
-        className: "custom-toast",
-      });
-      navigate("/admin/add-course")
-      refetch();
-    }
-    if (error) {
-      
-  
-    
-      toast.error(error?.message || error?.data?.message || "An error occurred", {
-        className: "custom-toast",
-      });
-    }
-  }, [isSuccess, error]);
-  
+    if (isSuccess) { toast.success(data?.message || "Course created"); refetch(); navigate("/admin/add-course"); }
+    if (error) toast.error(error?.data?.message || "Couldn’t create the course");
+  }, [data?.message, error, isSuccess, navigate, refetch]);
 
-  const getSelectedCategory = (val)=>{
-    setCategory(val);
-  }
-  const categories = [
-    { label: "Web Development", courses: ["HTML", "CSS", "JavaScript", "React", "Vue.js", "Next.js"] },
-    { label: "Data Science & Analytics", courses: ["Python", "R", "SQL", "Machine Learning", "Pandas"] },
-    { label: "Backend Development", courses: ["Node.js", "Django", "Spring Boot", "GoLang"] },
-    { label: "Cloud Computing", courses: ["AWS", "Azure", "Google Cloud", "Kubernetes"] },
-    { label: "Cybersecurity", courses: ["Ethical Hacking", "Penetration Testing", "Network Security"] },
-    { label: "Programming Languages", courses: ["C", "C++", "Java", "Python", "Rust"] },
-  ];
   return (
-    <>
-      <div className='flex-1 space-y-6 border rounded-lg border-gray-900 shadow-2xl p-5 '>
-        <div className=' space-y-2'>
-          <h1 className='font-bold text-xl'>Unlock New Horizons: Add Your Course and Share Knowledge!
-          </h1>
-          <p className='text-sm'>Share your expertise, inspire learners, and create impact by adding your course to empower future minds!</p>
+    <div className="mx-auto max-w-3xl py-3 md:py-8">
+      <Link to="/admin/add-course" className="inline-flex items-center gap-2 text-sm font-semibold text-[#82978f] hover:text-[#f6f3de]"><ArrowLeft size={16}/> Course library</Link>
+      <div className="mt-8"><span className="eyebrow"><Sparkles size={14}/> New course</span><h1 className="mt-4 text-4xl font-extrabold tracking-[-.055em] text-[#f6f3de]">Start with a strong premise.</h1><p className="muted-copy mt-3">Give your course a clear title and a useful home. You can shape the details next.</p></div>
+      <div className="mt-9 space-y-6 rounded-[24px] border border-white/10 bg-[#10231e] p-6 md:p-8">
+        <label className="block"><span className="mb-2 block text-xs font-bold uppercase tracking-[.13em] text-[#70877e]">Course title</span><input value={courseTitle} onChange={(event) => setCourseTitle(event.target.value)} placeholder="e.g. Design systems that scale" className="w-full rounded-2xl border border-white/10 bg-[#07110f] px-4 py-4 outline-none focus:border-[#c9ff62]/50"/></label>
+        <div><span className="mb-2 block text-xs font-bold uppercase tracking-[.13em] text-[#70877e]">Category</span>
+          <Select onValueChange={setCategory}><SelectTrigger className="h-14 w-full rounded-2xl border-white/10 bg-[#07110f]"><SelectValue placeholder="Choose the closest category"/></SelectTrigger><SelectContent className="border-white/10 bg-[#0d1d19] text-[#f6f3de]">{categoryGroups.map((group) => <SelectGroup key={group.label}><SelectLabel>{group.label}</SelectLabel>{group.courses.map((course) => <SelectItem key={course} value={course.toLowerCase()}>{course}</SelectItem>)}</SelectGroup>)}</SelectContent></Select>
         </div>
-        <div className='space-y-4'>
-          <Label>
-            Title
-          </Label>
-          <Input value={courseTitle} onChange={(e)=>setCourseTitle(e.target.value)} type="text" placeholder="Your course name" name="courseTitle" className="max-w-xl">
-          </Input>
-        </div>
-        <div className='space-y-4'>
-          <Label>
-           Select Category
-          </Label>
-          <Select onValueChange={getSelectedCategory}>
-      <SelectTrigger className="w-[240px]">
-        <SelectValue placeholder="Select a course" />
-      </SelectTrigger>
-      <SelectContent  side="bottom" align="start">
-        {categories.map((category) => (
-          <SelectGroup key={category.label} >
-            <SelectLabel className='border'>{category.label}</SelectLabel>
-            {category.courses.map((course) => (
-              <SelectItem key={course} value={course.toLowerCase()}>
-                {course}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
-
-        </div>
-        <div className='flex gap-5'>
-          <Link to="/admin/add-course">
-          <Button variant ="outline">Previous</Button>
-          </Link>
-          <Button className="border-white bg-gradient-to-l from-blue-500 via-purple-500 to-pink-500 text-white 
-             font-semibold py-1 px-6 rounded-lg shadow-lg 
-             transition-all duration-300 ease-in-out 
-             hover:from-purple-500 hover:via-pink-500 hover:to-yellow-500 
-             hover:shadow-xl active:scale-95 disabled:opacity-50 border"
-             onClick ={createCourseHandler}>{
-              isLoading ?(
-                <>
-                <Loader2 className='mr-2 h-4 w-4 animate-spin'>
-
-                </Loader2>
-                
-                </>
-              ):"Create"
-             }</Button>
-        </div>
-
-
-
-
+        <div className="flex justify-end border-t border-white/10 pt-6"><button disabled={!courseTitle || !category || isLoading} onClick={() => createCourse({ courseTitle, category })} className="lime-button disabled:cursor-not-allowed disabled:opacity-40">{isLoading ? <Loader2 className="animate-spin" size={17}/> : <>Create course <ArrowRight size={17}/></>}</button></div>
       </div>
-    </>
-  )
-}
+    </div>
+  );
+};
 
-export default AddCourse
+export default AddCourse;

@@ -1,27 +1,11 @@
 // client/src/Features/Apis/authApi.js
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import { loginUser, logoutUser } from "../auth/authSlice.js";
-
-const Base_USER_AUTH_API = "https://koursify-backend.onrender.com/api/user/";
+import { createAuthenticatedBaseQuery } from "./baseQuery.js";
 
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: Base_USER_AUTH_API,
-    // ✅ REMOVED: credentials: "include" - we're using Bearer token only
-
-    prepareHeaders: (headers) => {
-      const token = localStorage.getItem("token");
-
-      // ✅ SIMPLIFIED TOKEN CHECK
-      if (token && token !== "undefined" && token !== "null") {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
-
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: createAuthenticatedBaseQuery("user"),
   tagTypes: ["User"],
   endpoints: (builder) => ({
     registerUser: builder.mutation({
@@ -66,6 +50,15 @@ export const authApi = createApi({
       providesTags: ["User"],
     }),
 
+    updateUser: builder.mutation({
+      query: (formData) => ({
+        url: "get-profile/update-Profile",
+        method: "PUT",
+        body: formData,
+      }),
+      invalidatesTags: ["User"],
+    }),
+
     logoutUser: builder.mutation({
       query: () => ({
         url: "logout",
@@ -84,5 +77,6 @@ export const {
   useRegisterUserMutation,
   useUloginUserMutation,
   useGetUserQuery,
+  useUpdateUserMutation,
   useLogoutUserMutation,
 } = authApi;

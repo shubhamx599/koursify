@@ -1,60 +1,69 @@
-import Courses from "@/AppComonents/Student/Courses";
-import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import react, { useState } from "react"
+import { useState } from "react";
+import { ArrowRight, BookOpenCheck, Play, Search, Sparkles, UsersRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Courses from "@/AppComonents/Student/Courses";
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const [searchQuery,setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const searchHandler = (e) =>{
-    e.preventDefault();
-    if(searchQuery.trim() != ""){
-      navigate(`/course/search?query=${searchQuery}`)
+  const searchHandler = (event) => {
+    event.preventDefault();
+    navigate(`/course/search?query=${encodeURIComponent(searchQuery.trim())}`);
+  };
 
-    }
+  return (
+    <>
+      <section className="page-container overflow-hidden rounded-[32px] border border-white/10 bg-[#0d1d19]">
+        <div className="grid min-h-[620px] lg:grid-cols-[1.18fr_.82fr]">
+          <div className="flex flex-col justify-center px-6 py-16 md:px-12 lg:px-16">
+            <span className="eyebrow"><Sparkles size={14}/> Learn what moves you</span>
+            <h1 className="display-title mt-7 max-w-3xl">
+              Skills that turn <span className="text-[#c9ff62]">curiosity</span> into momentum.
+            </h1>
+            <p className="muted-copy mt-7 max-w-xl text-base leading-7 md:text-lg">
+              Practical courses, thoughtful instructors, and a learning space designed to keep you moving forward.
+            </p>
 
-  }
-  return (<>
-    <div className="relative mt-[100px] md:mr-10 md:ml-10 ml-5 mr-5  bg-gray-950/60 py-16 px-4  rounded-md text-center border selection-none flex items-center ">
-      <div className="w-full mx-auto selection-none">
-        <h1 className=" md:text-6xl text-5xl font-bold mb-6 bg-gradient-to-r from-blue-300 via-blue-50 to-gray-600 text-transparent bg-clip-text tracking-[5px]  ">Search Your Super Skill</h1>
-        <p className="text-blue-200 md:text-lg selection-none  tracking-wider">Unlock your potential discover courses that match your passion</p>
-        <p className="text-blue-200/70 md:text-lg tracking-wide">and take the first step toward your dream career!</p>
-        <form onSubmit={searchHandler} className="selection-none flex items-center rounded-full overflow-hidden max-w-2xl mx-auto mb-6 bg-gray-600/20 border mt-6">
-          <input
-          value={searchQuery}
-          onChange={(e)=>setSearchQuery(e.target.value)}
-            type="text"
-            className="flex-grow bg-transparent text-white px-5 py-3 outline-none focus:ring-0 focus:outline-none"
-            placeholder="Search for courses..."
-          />
-          <Button type="submit" className="bg-transparent text-white px-6 py-3 rounded-r-full hover:bg-transparent">
-            <Search />
-          </Button>
-        </form>
-        <Button onClick={()=>navigate("/course/search?query")}  className=" px-5 py-5 text-center rounded-xl border-white text-lg border-2 bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white 
-             font-semibold  shadow-lg 
-             transition-all duration-300 ease-in-out 
-             hover:from-blue-500 hover:via-purple-500 hover:to-pink-500 
-             hover:shadow-xl active:scale-95 disabled:opacity-50 selection-none  ">Explore</Button>
+            <form onSubmit={searchHandler} className="mt-9 flex max-w-xl items-center gap-2 rounded-full border border-white/10 bg-[#07110f] p-2 pl-5 shadow-inner">
+              <Search className="shrink-0 text-[#7d938a]" size={19}/>
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[#61756d]"
+                placeholder="What do you want to learn?"
+              />
+              <button type="submit" className="lime-button min-h-11 shrink-0 px-4 text-sm md:px-5">
+                Search <ArrowRight size={16}/>
+              </button>
+            </form>
 
+            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm text-[#9dafa8]">
+              <span className="flex items-center gap-2"><UsersRound size={17} className="text-[#c9ff62]"/> Learn at your pace</span>
+              <span className="flex items-center gap-2"><BookOpenCheck size={17} className="text-[#c9ff62]"/> Track every milestone</span>
+            </div>
+          </div>
 
+          <div className="relative hidden overflow-hidden border-l border-white/10 bg-[#132a24] lg:block">
+            <div className="absolute -right-16 top-16 h-72 w-72 rounded-full border-[52px] border-[#c9ff62]/90" />
+            <div className="absolute bottom-10 left-10 right-10 rounded-[28px] border border-white/10 bg-[#07110f]/80 p-6 backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[.16em] text-[#7d938a]">Continue learning</p>
+                  <h3 className="mt-2 text-xl font-bold text-[#f6f3de]">Build your next chapter</h3>
+                </div>
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-[#c9ff62] text-[#07110f]"><Play size={18} fill="currentColor"/></span>
+              </div>
+              <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[68%] rounded-full bg-[#77e6d1]"/></div>
+              <div className="mt-3 flex justify-between text-xs text-[#9dafa8]"><span>8 of 12 lessons</span><span>68%</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-
-
-      </div>
-
-    </div>
-    <div className="relative mt-5 md:mr-10 md:ml-10 ml-5 mr-5 rounded-md  border selection-none mb-4">
       <Courses />
-    </div>
+    </>
+  );
+};
 
-
-
-
-
-  </>)
-}
 export default HomePage;

@@ -1,36 +1,17 @@
-import { Badge } from '../../components/ui/badge.jsx';
-import React from 'react';
-import { Link } from 'react-router-dom';
+import { ArrowUpRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
-const SearchResult = ({ course }) => {
-  
-
-  return (
-    <div className='flex flex-col md:flex-row justify-between items-start md:items-center border py-4 gap-4 m-3 bg-gray-900/30 rounded-lg'>
-      <Link to={`/detail-page/${course._id}`} className="flex flex-col md:flex-row gap-4 w-full md:w-auto md:pl-4 px-4 ">
-        {/* Updated Image */}
-        <img
-          src={course.courseThumbnail} // Test with a working image URL
-          alt="Course thumbnail"
-          className='h-44 md:h-32 w-full md:w-56 object-fill rounded border' 
-        />
-        <div className='flex flex-col gap-2'>
-          <h1 className='font-bold text-lg md:text-xl'>{course.courseTitle}</h1>
-          <p className='text-sm text-gray-600'>{course.subTitle}</p>
-          <p className='text-sm text-gray-300'>{course.creator.email.slice(0,6)
-}</p>
-          <Badge className="w-fit mt-2 md:mt-0">
-            {
-              course.courseLevel
-            }
-          </Badge>
-        </div>
-      </Link>
-      <div className=' md:mt-8 md:text-right w-full md:w-auto md:mr-4 ml-6'>
-        <h1>₹ {course?.coursePrice}</h1>
-      </div>
+const SearchResult = ({ course }) => (
+  <Link to={`/detail-page/${course._id}`} className="group flex flex-col gap-5 rounded-[24px] border border-white/10 bg-[#0d1d19] p-3 transition hover:border-[#c9ff62]/30 sm:flex-row">
+    <div className="aspect-[16/10] w-full overflow-hidden rounded-[18px] bg-[#17352d] sm:w-56">
+      {course.courseThumbnail && <img src={course.courseThumbnail} alt={course.courseTitle} className="h-full w-full object-cover transition duration-500 group-hover:scale-105"/>}
     </div>
-  );
-};
+    <div className="flex min-w-0 flex-1 flex-col p-2 sm:py-3">
+      <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#c9ff62]">{course.category || "Course"}</p><h3 className="mt-2 text-xl font-bold text-[#f6f3de]">{course.courseTitle}</h3></div><ArrowUpRight className="shrink-0 text-[#c9ff62]" size={19}/></div>
+      <p className="mt-2 line-clamp-2 text-sm text-[#7f948b]">{course.subTitle}</p>
+      <div className="mt-auto flex items-end justify-between pt-4"><p className="text-xs text-[#82978f]">By {course.creator?.name || course.creator?.email?.split("@")[0]}</p><p className="text-xl font-extrabold text-[#f6f3de]">₹{course.coursePrice || 0}</p></div>
+    </div>
+  </Link>
+);
 
 export default SearchResult;

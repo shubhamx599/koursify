@@ -1,268 +1,144 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useUloginUserMutation, useRegisterUserMutation } from "@/Features/Apis/authApi";
-import { toast } from "react-toastify"; // Importing toast notification
+import { ArrowRight, BookOpen, Check, Sparkles } from "lucide-react";
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRegisterUserMutation, useUloginUserMutation } from "@/Features/Apis/authApi";
+
+const Field = ({ label, ...props }) => (
+  <label className="block">
+    <span className="mb-2 block text-xs font-bold uppercase tracking-[.12em] text-[#7f938b]">{label}</span>
+    <input {...props} className="h-13 w-full rounded-2xl border border-white/10 bg-[#07110f] px-4 py-3.5 text-sm outline-none transition placeholder:text-[#4e645b] focus:border-[#c9ff62]/60 focus:ring-4 focus:ring-[#c9ff62]/5"/>
+  </label>
+);
 
 const Login = () => {
-  const [login, setLogin] = useState({ email: "", password: "" });
-  const [signup, setSignup] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    role: "student", // Added role property
-  });
-  const [registerUser, { isError: regError, isLoading: regLoading, isSuccess: regIsSuccess }] = useRegisterUserMutation();
-  const [loginUser, { isError: logError, isLoading: logLoading, isSuccess: logIsSuccess }] = useUloginUserMutation();
   const navigate = useNavigate();
+  const [login, setLogin] = useState({ email: "", password: "" });
+  const [signup, setSignup] = useState({ email: "", password: "", confirmPassword: "", role: "student" });
   const [errors, setErrors] = useState({});
+  const [registerUser, { isLoading: registering }] = useRegisterUserMutation();
+  const [loginUser, { isLoading: loggingIn }] = useUloginUserMutation();
 
-  const handleChangeInput = (e, type) => {
-    const { name, value } = e.target;
-    if (type === "signup") {
-      setSignup((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    } else {
-      setLogin((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
-  };
+  const update = (setter) => (event) => setter((current) => ({ ...current, [event.target.name]: event.target.value }));
 
-  const handleRegistration = async (type) => {
-    const inputData = type === "signup" ? signup : login;
-    const action = type === "signup" ? registerUser : loginUser;
-
-    // Reset errors before validating
+  const submit = async (type) => {
     setErrors({});
+    const isSignup = type === "signup";
+    const values = isSignup ? signup : login;
 
-    // Validation for signup
-    if (type === "signup") {
-      if (!signup.email || !signup.password || !signup.confirmPassword || !signup.role) {
-        setErrors((prev) => ({
-          ...prev,
-          fields: "Please fill out all fields.",
-        }));
-        return;
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(signup.email)) {
-        setErrors((prev) => ({
-          ...prev,
-          email: "Invalid email format.",
-        }));
-        return;
-      }
-
-      if (signup.password !== signup.confirmPassword) {
-        setErrors((prev) => ({
-          ...prev,
-          confirmPassword: "Passwords do not match.",
-        }));
-        return;
-      }
-
-      const passwordRegex = /^(?=.*[a-z])(?=.*[\W_]).{7,}$/;
-      if (!passwordRegex.test(signup.password)) {
-        setErrors((prev) => ({
-          ...prev,
-          password: "Password must be at least 7 characters, contain one lowercase letter, and one special character.",
-        }));
-        return;
-      }
+    if (!values.email || !values.password || (isSignup && !values.confirmPassword)) {
+      return setErrors({ form: "Please complete every field." });
+    }
+    if (isSignup && values.password !== values.confirmPassword) {
+      return setErrors({ form: "Those passwords don’t match yet." });
+    }
+    if (isSignup && !/^(?=.*[a-z])(?=.*[\W_]).{7,}$/.test(values.password)) {
+      return setErrors({ form: "Use 7+ characters with a lowercase letter and a symbol." });
     }
 
-    // Proceed to register or login user
     try {
-      const response = await action(inputData).unwrap();
-
-      if (type === "signup" && response) {
-        toast.success("Account created successfully! 🎉", {
-          className: "custom-toast",});
-        setErrors({});
-        setSignup({ email: "", password: "", confirmPassword: "", role: "student" }); // Reset role after signup
-        toast.success("Now Login through account! 🎉", {
-          className: "custom-toast",});
-      } else if (type === "login" && response) {
-        toast.success("Login successful! 🎉",
-           {
-            className: "custom-toast",}
-        );
-        setErrors({});
-        setLogin({ email: "", password: "" });
-         navigate("/");
+      await (isSignup ? registerUser(values) : loginUser(values)).unwrap();
+      if (isSignup) {
+        setSignup({ email: "", password: "", confirmPassword: "", role: "student" });
+        toast.success("Account ready. Sign in to start learning.");
+      } else {
+        toast.success("Welcome back.");
+        navigate("/");
       }
     } catch (error) {
-      console.error("Error during registration/login:", error);
-      setErrors((prev) => ({
-        ...prev,
-        error: error?.data?.message || "An error occurred. Please try again later.",
-      }));
-      setSignup({ email: "", password: "", confirmPassword: "", role: "student" });
-      setLogin({ email: "", password: "" });
-      toast.error(error?.data?.message || "An error occurred. Please try again later.");
+      setErrors({ form: error?.data?.message || "Something went wrong. Please try again." });
     }
   };
 
   return (
-    <div className="h-[100vh] flex justify-center items-center select-none  ">
-      <Tabs defaultValue="register" className="md:w-[450px] z-10">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="login">Login</TabsTrigger>
-          <TabsTrigger value="register">Register</TabsTrigger>
-        </TabsList>
+    <div className="site-shell grid min-h-screen lg:grid-cols-[.9fr_1.1fr]">
+      <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#10251f] p-12 lg:flex lg:flex-col lg:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#c9ff62] text-[#07110f]"><BookOpen size={21}/></span>
+          <span className="text-xl font-extrabold tracking-tight">Koursify.</span>
+        </div>
+        <div className="relative z-10 max-w-xl">
+          <span className="eyebrow"><Sparkles size={14}/> Your next chapter</span>
+          <h1 className="mt-6 text-6xl font-extrabold leading-[.98] tracking-[-.07em] text-[#f6f3de]">Make learning your unfair advantage.</h1>
+          <div className="mt-9 space-y-4 text-sm text-[#afc0b9]">
+            {["Learn from focused, practical courses", "Track progress without the clutter", "Build skills you can actually use"].map((item) => (
+              <p key={item} className="flex items-center gap-3"><span className="grid h-6 w-6 place-items-center rounded-full bg-[#c9ff62]/10 text-[#c9ff62]"><Check size={13}/></span>{item}</p>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs uppercase tracking-[.16em] text-[#5f766c]">Learn deliberately · Grow visibly</p>
+        <div className="absolute -right-20 top-20 h-72 w-72 rounded-full border-[56px] border-[#c9ff62]/10"/>
+      </section>
 
-        {/* Login Tab */}
-        <TabsContent value="login">
-          <Card className="bg-slate-800/20">
-            <CardHeader>
-              <CardTitle>Login</CardTitle>
-              <CardDescription>
-                Access your account by logging in below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={login.email}
-                  onChange={(e) => handleChangeInput(e, "login")}
-                  placeholder="eg: samyak@gmail.com"
-                  required
-                />
-                {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  value={login.password}
-                  onChange={(e) => handleChangeInput(e, "login")}
-                  type="password"
-                  placeholder="Enter your password"
-                  required
-                />
-                {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => handleRegistration("login")} className="bg-blue-950 text-white border border-gray-600 rounded-lg px-6 py-2 hover:bg-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 tracking-widest transition duration-300 ease-in-out hover:border-blue-500">
-                Login
-              </Button>
-              {errors.error && <p className="text-red-500 text-sm">{errors.error}</p>}
-              {errors.success && <p className="text-green-500 text-sm">{errors.success}</p>}
-            </CardFooter>
-          </Card>
-        </TabsContent>
+      <section className="flex items-center justify-center px-5 py-12">
+        <div className="w-full max-w-md">
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#c9ff62] text-[#07110f]"><BookOpen size={19}/></span>
+            <span className="text-xl font-extrabold">Koursify.</span>
+          </div>
+          <h2 className="text-4xl font-extrabold tracking-[-.055em] text-[#f6f3de]">Welcome in.</h2>
+          <p className="muted-copy mt-3">Sign in or create your learner account.</p>
 
-        {/* Register Tab */}
-        <TabsContent value="register">
-          <Card className="bg-slate-800/20">
-            <CardHeader>
-              <CardTitle>Register</CardTitle>
-              <CardDescription>
-                Create a new account by filling out the fields below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="eg: samyak@gmail.com"
-                  value={signup.email}
-                  onChange={(e) => handleChangeInput(e, "signup")}
-                  required
-                />
-                {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={signup.password}
-                  onChange={(e) => handleChangeInput(e, "signup")}
-                  placeholder="Create a password"
-                  required
-                />
-                {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={signup.confirmPassword}
-                  onChange={(e) => handleChangeInput(e, "signup")}
-                  type="password"
-                  placeholder="Confirm your password"
-                  required
-                />
-                {errors.confirmPassword && <p className="text-red-500 text-sm">{errors.confirmPassword}</p>}
-              </div>
-              {/* Role Selection (Radio Buttons) */}
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <div className="flex items-center space-x-4">
-                  <div>
-                    <input
-                      type="radio"
-                      id="student"
-                      name="role"
-                      value="student"
-                      checked={signup.role === "student"}
-                      onChange={(e) => handleChangeInput(e, "signup")}
-                    />
-                    <Label htmlFor="student" className="ml-2">Student</Label>
-                  </div>
-                  <div>
-                    <input
-                      type="radio"
-                      id="instructor"
-                      name="role"
-                      value="instructor"
-                      checked={signup.role === "instructor"}
-                      onChange={(e) => handleChangeInput(e, "signup")}
-                    />
-                    <Label htmlFor="instructor" className="ml-2">Instructor</Label>
-                  </div>
+          <Tabs defaultValue="login" className="mt-8">
+            <TabsList className="grid h-12 w-full grid-cols-2 rounded-full border border-white/10 bg-[#0d1d19] p-1">
+              <TabsTrigger value="login" className="rounded-full data-[state=active]:bg-[#c9ff62] data-[state=active]:text-[#07110f]">Sign in</TabsTrigger>
+              <TabsTrigger value="register" className="rounded-full data-[state=active]:bg-[#c9ff62] data-[state=active]:text-[#07110f]">Create account</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login" className="mt-7 space-y-5">
+              <Field label="Email address" name="email" type="email" value={login.email} onChange={update(setLogin)} placeholder="you@example.com"/>
+              <Field label="Password" name="password" type="password" value={login.password} onChange={update(setLogin)} placeholder="Your password"/>
+              {errors.form && <p className="rounded-xl border border-red-400/15 bg-red-400/5 px-4 py-3 text-sm text-red-300">{errors.form}</p>}
+              <button disabled={loggingIn} onClick={() => submit("login")} className="lime-button w-full">
+                {loggingIn ? "Signing in…" : "Sign in"} <ArrowRight size={17}/>
+              </button>
+            </TabsContent>
+
+            <TabsContent value="register" className="mt-7 space-y-5">
+              <Field label="Email address" name="email" type="email" value={signup.email} onChange={update(setSignup)} placeholder="you@example.com"/>
+              <Field label="Create password" name="password" type="password" value={signup.password} onChange={update(setSignup)} placeholder="7+ characters"/>
+              <Field label="Confirm password" name="confirmPassword" type="password" value={signup.confirmPassword} onChange={update(setSignup)} placeholder="Type it once more"/>
+              
+              {/* Account Type Selector */}
+              <div className="block">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[.12em] text-[#7f938b]">I want to:</span>
+                <div className="grid grid-cols-2 gap-3 mt-1.5">
+                  <button 
+                    type="button"
+                    onClick={() => setSignup(prev => ({ ...prev, role: "student" }))}
+                    className={`py-3 px-4 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1.5 ${
+                      signup.role === "student" 
+                        ? "border-[#c9ff62]/30 bg-[#c9ff62]/5 text-[#c9ff62]" 
+                        : "border-white/5 bg-[#0d1d19]/40 text-[#8ea197] hover:border-white/10"
+                    }`}
+                  >
+                    <span>Learn Courses</span>
+                    <span className="text-[10px] font-normal text-white/40">Student Account</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setSignup(prev => ({ ...prev, role: "instructor" }))}
+                    className={`py-3 px-4 rounded-xl border text-xs font-bold transition flex flex-col items-center justify-center gap-1.5 ${
+                      signup.role === "instructor" 
+                        ? "border-[#c9ff62]/30 bg-[#c9ff62]/5 text-[#c9ff62]" 
+                        : "border-white/5 bg-[#0d1d19]/40 text-[#8ea197] hover:border-white/10"
+                    }`}
+                  >
+                    <span>Teach Courses</span>
+                    <span className="text-[10px] font-normal text-white/40">Instructor Account</span>
+                  </button>
                 </div>
-                {errors.role && <p className="text-red-500 text-sm">{errors.role}</p>}
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={() => handleRegistration("signup")} className="bg-blue-950 text-white border border-gray-600 rounded-lg px-6 py-2 hover:bg-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-opacity-50 tracking-widest transition duration-300 ease-in-out hover:border-blue-500">
-                Register
-              </Button>
-              {errors.error && <p className="text-red-500 text-sm">{errors.error}</p>}
-              {errors.success && <p className="text-green-500 text-sm">{errors.success}</p>}
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+              {errors.form && <p className="rounded-xl border border-red-400/15 bg-red-400/5 px-4 py-3 text-sm text-red-300">{errors.form}</p>}
+              <button disabled={registering} onClick={() => submit("signup")} className="lime-button w-full">
+                {registering ? "Creating account…" : signup.role === "instructor" ? "Create instructor account" : "Create learner account"} <ArrowRight size={17}/>
+              </button>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </section>
     </div>
   );
 };

@@ -1,50 +1,32 @@
-import { SkeletonCard } from "@/AppComonents/Commom/CourseSkeleton";
+import { useState } from "react";
+import { Search } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import Filter from "@/AppComonents/Student/Filter";
 import SearchResult from "@/AppComonents/Student/SearchResult";
+import { SkeletonCard } from "@/AppComonents/Commom/CourseSkeleton";
 import { useGetSearhCourseQuery } from "@/Features/Apis/courseApi";
-import React, { useState } from "react";
-import { useSearchParams } from "react-router-dom";
 
 const SearchPage = () => {
-  const [searchParams] = useSearchParams();  // ✅ Correct Destructuring
-  const query = searchParams.get("query");
-  const [selectedCategories,setSelectedCategories] = useState([]);
-  const [sortByPrice,setSortByPrice] = useState("");
-
-  const { data, isLoading } = useGetSearhCourseQuery({
-    squery :query , 
-    categories : selectedCategories, 
-    sortByPrice
-  }); 
-  console.log(data);
-  const handleFilterChange = (categories,price) =>{
-    setSelectedCategories(categories);
-    setSortByPrice(price)
-  }
-
- 
-  const isEmpty = !data || data?.courses.length === 0;
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("query") || "";
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [sortByPrice, setSortByPrice] = useState("");
+  const { data, isLoading } = useGetSearhCourseQuery({ squery: query, categories: selectedCategories, sortByPrice });
+  const courses = data?.courses || [];
 
   return (
-    <div className="max-w-7xl relative md:mx-16 bg-gray-700/10 border rounded-lg mx-4 p-4 md:px-8 mt-24 tracking-wide">
-      <div className="">
-        <h1 className="bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo text-3xl">{ query?`Results for ${query}`:"Expllore Courses"}</h1>
-        <p className="mt-3 text-2xl">
-        { query?`Showing results for `:""}
-          <span className="text-blue-800 font-bold italic ml-1">{query}</span>
-        </p>
+    <div className="page-container pb-20 pt-8">
+      <div className="rounded-[28px] border border-white/10 bg-[#0d1d19] px-6 py-9 md:px-10">
+        <span className="eyebrow"><Search size={14}/> Course finder</span>
+        <h1 className="mt-4 text-4xl font-extrabold tracking-[-.055em] text-[#f6f3de]">{query ? `Results for “${query}”` : "Explore the catalogue"}</h1>
+        <p className="muted-copy mt-3">{isLoading ? "Searching…" : `${courses.length} course${courses.length === 1 ? "" : "s"} found`}</p>
       </div>
-
-      <div className="flex flex-col md:flex-row font-bold gap-9">
-        <Filter handleFilterChange={handleFilterChange} />
-        <div className="flex-1">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, idx) => <SkeletonCard key={idx} />)
-          ) : isEmpty ? (
-            <p className="text-gray-400 text-center">Course not found</p>
-          ) : (
-            data?.courses.map((course) => <SearchResult key={course._id} course={course} />)
-          )}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
+        <Filter handleFilterChange={(categories, price) => { setSelectedCategories(categories); setSortByPrice(price); }}/>
+        <div className="space-y-4">
+          {isLoading ? Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index}/>) :
+            courses.length ? courses.map((course) => <SearchResult key={course._id} course={course}/>) :
+            <div className="surface grid min-h-64 place-items-center rounded-[24px] text-[#7f948b]">No courses match those filters yet.</div>}
         </div>
       </div>
     </div>

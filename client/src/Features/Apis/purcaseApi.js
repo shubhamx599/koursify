@@ -1,14 +1,10 @@
 // client/src/Features/Apis/purcaseApi.js
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const BASE_USER_COURSE_PURCHASE_API = "https://koursify-backend.onrender.com/api/purchase/";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { createAuthenticatedBaseQuery } from "./baseQuery.js";
 
 export const purchaseApi = createApi({
     reducerPath: "purchaseApi",
-    baseQuery: fetchBaseQuery({
-        baseUrl: BASE_USER_COURSE_PURCHASE_API,
-        credentials: "include"
-    }),
+    baseQuery: createAuthenticatedBaseQuery("purchase"),
     endpoints: (builder) => ({
         // Razorpay Order Creation
         createRazorpayOrder: builder.mutation({

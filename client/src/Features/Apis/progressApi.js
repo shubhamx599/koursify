@@ -1,13 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-
-const BASE_USER_COURSE_PROGRESS_API = "https://koursify-backend.onrender.com/api/progress/";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { createAuthenticatedBaseQuery } from "./baseQuery.js";
 
 export const progressApi = createApi({
     reducerPath: "progressApi",
-    baseQuery: fetchBaseQuery({
-        baseUrl: BASE_USER_COURSE_PROGRESS_API,
-        credentials: "include"
-    }),
+    baseQuery: createAuthenticatedBaseQuery("progress"),
     endpoints: (builder) => ({
         getCourseProgress: builder.query({
             query: (courseId) => ({
@@ -29,7 +25,7 @@ export const progressApi = createApi({
         }),
         inCompleteCourse: builder.mutation({
             query: (courseId) => ({
-                url: `${courseId}/incomplete`,
+                url: `${courseId}/InComplete`,
                 method: "POST"
             })
         })

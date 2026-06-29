@@ -1,41 +1,34 @@
-import React from 'react';
-import { SkeletonCard } from '../Commom/CourseSkeleton.jsx';
-import Course from './course.jsx';
-import { useGetPublishCourseQuery } from '../../Features/Apis/courseApi.js';
+import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useGetPublishCourseQuery } from "../../Features/Apis/courseApi.js";
+import { SkeletonCard } from "../Commom/CourseSkeleton.jsx";
+import Course from "./course.jsx";
 
 const Courses = () => {
-  const {data,isLoading,isError} = useGetPublishCourseQuery();
-  console.log(data);
-  if(isError){
-    <div className='flex justify-center items-center'>
-      <h1 className='text-3xl '>
-        Server not responding....
-      </h1>
-    </div>
-  }
+  const { data, isLoading, isError } = useGetPublishCourseQuery();
   const courses = data?.courses || [];
+
   return (
-    <>
-      <div className="bg-gray-950/40 flex justify-center">
-        <div className="max-w-7xl w-full p-6">
-          <h2 className="font-bold text-3xl text-center mb-18 tracking-wider bg-gradient-to-r from-blue-300 via-blue-200 to-gray-200 text-transparent bg-clip-text">
-            Our Courses
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {isLoading
-              ? Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-center items-center"
-                  >
-                    <SkeletonCard key={index} />
-                  </div>
-                ))
-              :courses.map((course,index)=>(<Course key={course._id} course={course}/>)) }
-          </div>
+    <section className="page-container py-20 md:py-28">
+      <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+        <div>
+          <span className="eyebrow">Fresh perspectives</span>
+          <h2 className="section-title mt-4">Courses worth your attention.</h2>
+          <p className="muted-copy mt-3 max-w-xl">Curated learning paths built for useful, visible progress.</p>
         </div>
+        <Link to="/course/search?query=" className="ghost-button w-fit text-sm">Browse all courses <ArrowRight size={16}/></Link>
       </div>
-    </>
+
+      {isError ? (
+        <div className="surface mt-10 rounded-[24px] p-8 text-center text-[#9dafa8]">Courses are taking a breather. Try again shortly.</div>
+      ) : (
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} />)
+            : courses.map((course) => <Course key={course._id} course={course}/>)}
+        </div>
+      )}
+    </section>
   );
 };
 

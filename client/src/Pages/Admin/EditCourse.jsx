@@ -1,6 +1,5 @@
 import CourseTab from '@/AppComonents/Admin/CourseTab'
-import { Button } from '@/components/ui/button'
-import { UploadCloudIcon } from 'lucide-react'
+import { ArrowLeft, UploadCloud } from 'lucide-react'
 import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -8,23 +7,29 @@ const EditCourse = () => {
     const { courseId } = useParams();
   
   return (
-    <div className='flex-1 space-y-4'>
-        <div className='flex items-center justify-between'>
-            <h1 className='font-bold text-xl'>
-                Add Details about Course
-            </h1>
-            <Link to={`/admin/add-course/${ courseId}/lectures`}>
-            <Button variant="outline" className="">
-            <UploadCloudIcon className='w-24 h-24' />
-
-                Upload leture 
-                
-            </Button>
-            </Link>
+    <div className="flex-1 space-y-6">
+      <Link to="/admin/add-course" className="inline-flex items-center gap-2 text-sm font-semibold text-[#82978f] hover:text-[#f6f3de]">
+        <ArrowLeft size={16}/> Course library
+      </Link>
+      
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-[-.05em] text-[#f6f3de]">
+            Course details
+          </h1>
+          <p className="muted-copy mt-1 text-sm">Provide basic details and publish settings.</p>
         </div>
-        <CourseTab/>
+        <Link to={`/admin/add-course/${courseId}/lectures`}>
+          <button className="ghost-button text-sm min-h-11">
+            <UploadCloud size={16} />
+            Manage lectures
+          </button>
+        </Link>
+      </div>
+
+      <CourseTab />
     </div>
   )
 }
 
-export default EditCourse
+export default EditCourse;

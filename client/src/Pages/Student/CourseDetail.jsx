@@ -1,146 +1,45 @@
-// client/src/Pages/Student/CourseDetail.jsx
-import BuyButton from "@/AppComonents/Commom/BuyButton";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { useGetCourseDetailStatusQuery } from "@/Features/Apis/purcaseApi";
-import { BadgeInfo, Loader2Icon, LockIcon, PlayCircle } from "lucide-react";
-import React from "react";
+import { BadgeInfo, BookOpen, Check, Clock3, Loader2, Lock, PlayCircle, Users } from "lucide-react";
 import ReactPlayer from "react-player";
 import { useNavigate, useParams } from "react-router-dom";
+import BuyButton from "@/AppComonents/Commom/BuyButton";
+import { useGetCourseDetailStatusQuery } from "@/Features/Apis/purcaseApi";
 
 const CourseDetail = () => {
   const navigate = useNavigate();
   const { courseId } = useParams();
+  const { data, isLoading, isError } = useGetCourseDetailStatusQuery(courseId);
 
-  const handleContinueCourse = async () => {
-    if (purchased) {
-      navigate(`/course-progress/${courseId}`);
-    }
-  };
-
-  const { data, isLoading, error, isSuccess, isError } =
-    useGetCourseDetailStatusQuery(courseId);
-  console.log(data);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[100vh] w-full bg-black justify-center items-center ">
-        <Loader2Icon
-          size={22}
-          className="text-blue-600 h-12 w-12 animate-spin"
-        ></Loader2Icon>
-      </div>
-    );
-  }
-
-  if (isError) return <h1>Failed to load course detail</h1>;
+  if (isLoading) return <div className="grid min-h-[75vh] place-items-center"><Loader2 className="animate-spin text-[#c9ff62]"/></div>;
+  if (isError) return <div className="page-container grid min-h-[60vh] place-items-center text-[#ff9b8f]">We couldn’t load this course.</div>;
 
   const { course, purchased } = data || {};
+  const preview = course?.lectures?.find((lecture) => lecture.isPreviewFree && lecture.videoUrl) || course?.lectures?.[0];
 
   return (
-    <div className="relative mt-24 space-y-5 lg:mx-9 mb-4">
-      <div className="text-white border mx-4 bg-gray-900/30 rounded-lg">
-        <div className="ma-w-7xl mx-auto py-4 px-4 md:px-8 flex flex-col gap-2">
-          <h1 className="font-bold text-2xl md:text-3xl bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo">
-            {course?.courseTitle}
-          </h1>
-          <p className="text-base md:text-lg">{course?.subTitle}</p>
-          <p className="text-sm">
-            Created By{" "}
-            <span className="italic text-gray-300">
-              {course?.creator.email.slice(0, 6)}
-            </span>
-          </p>
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <BadgeInfo size={16}></BadgeInfo>
-            <p className="text-gray-300">
-              Last updated : {course?.createdAt.split("T")[0]}
-            </p>
+    <div className="page-container pb-20 pt-8">
+      <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#0d1d19]">
+        <div className="grid lg:grid-cols-[1.1fr_.9fr]">
+          <div className="flex flex-col justify-center p-7 md:p-12">
+            <span className="eyebrow">{course?.category || "Featured course"}</span>
+            <h1 className="mt-6 text-4xl font-extrabold leading-[1.03] tracking-[-.06em] text-[#f6f3de] md:text-6xl">{course?.courseTitle}</h1>
+            <p className="muted-copy mt-5 max-w-2xl text-base leading-7">{course?.subTitle}</p>
+            <div className="mt-7 flex flex-wrap gap-5 text-sm text-[#9badb6]">
+              <span className="flex items-center gap-2"><Users size={16} className="text-[#c9ff62]"/>{course?.enrolledStudents?.length || 0} learners</span>
+              <span className="flex items-center gap-2"><BookOpen size={16} className="text-[#c9ff62]"/>{course?.lectures?.length || 0} lessons</span>
+              <span className="flex items-center gap-2"><Clock3 size={16} className="text-[#c9ff62]"/>{course?.courseLevel}</span>
+            </div>
           </div>
-          <p className="text-gray-300">
-            Students enrolled : {course?.enrolledStudents.length}
-          </p>
+          <div className="border-t border-white/10 bg-[#132a24] p-5 lg:border-l lg:border-t-0">
+            <div className="aspect-video overflow-hidden rounded-[22px] bg-[#07110f]"><ReactPlayer width="100%" height="100%" url={preview?.videoUrl} controls/></div>
+            <div className="flex items-end justify-between gap-5 p-3 pt-6"><div><p className="text-xs uppercase tracking-[.14em] text-[#72887f]">{purchased ? "Already enrolled" : "One-time access"}</p><p className="mt-1 text-3xl font-extrabold text-[#f6f3de]">{purchased ? "Continue learning" : `₹${course?.coursePrice || 0}`}</p></div>
+            <div className="min-w-40">{purchased ? <button onClick={() => navigate(`/course-progress/${courseId}`)} className="lime-button w-full">Continue</button> : <BuyButton courseId={courseId} coursePrice={course?.coursePrice} courseTitle={course?.courseTitle}/>}</div></div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="max-w-7xl mx-auto my-5 px-4 flex flex-col lg:flex-row justify-between gap-10">
-        <div className="w-full space-y-4 border p-6 rounded-lg">
-          <h1 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo">
-            Description
-          </h1>
-          <p
-            className="text-sm text-gray-300 tracking-wider"
-            dangerouslySetInnerHTML={{ __html: course?.description }}
-          />
-
-          <Card className="bg-gray-900/30 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo">
-                Course Content
-              </CardTitle>
-              <CardDescription>
-                Total course : {course?.lectures.length}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {course?.lectures.map((lecture, index) => {
-                return (
-                  <div key={index} className="flex items-center gap-3 text-sm">
-                    <span>
-                      {lecture.isPreviewFree ? <PlayCircle /> : <LockIcon />}
-                    </span>
-                    <p className="text-white">{lecture?.lectureTitle}</p>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="w-full lg:w-1/2">
-          <Card className="bg-gray-900/30">
-            <CardContent className="p-4 flex flex-col">
-              <div className="w-full h-[200px] mb-4">
-                <ReactPlayer
-                  width="100%"
-                  height={"100%"}
-                  url={course?.lectures[0]?.videoUrl}
-                  controls={true}
-                  className="bg-black"
-                />
-              </div>
-              <h1 className="text-xl bg-gradient-to-r from-blue-300 via-blue-200 to-gray-300 text-transparent bg-clip-text logo">
-                {course?.lectures[0]?.lectureTitle}
-              </h1>
-              <h1 className="text-white text-lg font-bold mt-2">
-                {purchased ? "Already Purchased" : `₹${course?.coursePrice}`}
-              </h1>
-            </CardContent>
-            <CardFooter className="flex justify-center">
-              {purchased ? (
-                <Button
-                  onClick={handleContinueCourse}
-                  className="w-full bg-gray-900/70 hover:bg-gray-900/90 text-white border bg-gradient-to-l from-blue-500 via-purple-500 to-pink-500 shadow-lg text-center p-1 rounded-xl border-white mt-3"
-                >
-                  Continue Course
-                </Button>
-              ) : (
-                <BuyButton
-                  courseId={courseId}
-                  coursePrice={course?.coursePrice}
-                  courseTitle={course?.courseTitle}
-                />
-              )}
-            </CardFooter>
-          </Card>
-        </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_380px]">
+        <section className="surface rounded-[28px] p-6 md:p-8"><span className="eyebrow">What you’ll learn</span><div className="mt-5 text-sm leading-7 text-[#a6b7b0]" dangerouslySetInnerHTML={{ __html: course?.description || "A focused learning experience built around practical progress." }}/></section>
+        <section className="surface rounded-[28px] p-6"><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold text-[#f6f3de]">Course outline</h2><span className="text-xs text-[#71877e]">{course?.lectures?.length || 0} lessons</span></div><div className="mt-5 space-y-2">{course?.lectures?.map((lecture, index) => <div key={lecture._id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.02] p-3"><span className={`grid h-9 w-9 place-items-center rounded-xl ${lecture.isPreviewFree || purchased ? "bg-[#c9ff62]/10 text-[#c9ff62]" : "bg-white/5 text-[#5d726a]"}`}>{lecture.isPreviewFree || purchased ? <PlayCircle size={16}/> : <Lock size={15}/>}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-[#d9e2de]">{lecture.lectureTitle}</p><p className="mt-0.5 text-[10px] uppercase tracking-wider text-[#637970]">Lesson {index + 1}</p></div></div>)}</div></section>
       </div>
     </div>
   );

@@ -1,99 +1,58 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGetAllPurchaseAdminCourseQuery } from '@/Features/Apis/purcaseApi';
-import React from 'react';
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ArrowUpRight, BookOpen, IndianRupee, ShoppingBag, Sparkles } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useGetAllPurchaseAdminCourseQuery } from "@/Features/Apis/purcaseApi";
+
+const Metric = ({ icon: Icon, label, value, note }) => (
+  <div className="rounded-[22px] border border-white/10 bg-[#10231e] p-5">
+    <div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#c9ff62]/10 text-[#c9ff62]"><Icon size={18}/></span><ArrowUpRight className="text-[#516860]" size={17}/></div>
+    <p className="mt-7 text-xs font-bold uppercase tracking-[.13em] text-[#6f867d]">{label}</p>
+    <p className="mt-2 text-3xl font-extrabold tracking-tight text-[#f6f3de]">{value}</p>
+    <p className="mt-2 text-xs text-[#789087]">{note}</p>
+  </div>
+);
 
 const Dashboard = () => {
-  const { data, isSuccess, isError, isLoading } = useGetAllPurchaseAdminCourseQuery();
-
-  console.log(data)
-  if (isLoading) {
-    return <h1>Loading...</h1>;
-  }
-
-  if (isError) {
-    return <h1>Error loading data!</h1>;
-  }
-
-  // Destructure the data from the response
-  const purchaseCourse = data?.purchasedCourses || [];
-
-  // Prepare data for charts and cards
-  const totalSales = purchaseCourse.length; // Count the total number of purchases
-  const totalRevenue = purchaseCourse.reduce((acc, course) => acc + (course.amount || 0), 0); // Calculate total revenue
-
-  const courseData = purchaseCourse.map((course) => ({
-    name: course?.courseId?.courseTitle || 'Unknown Title',
-    price: course?.courseId?.coursePrice || 0,
+  const { data, isError, isLoading } = useGetAllPurchaseAdminCourseQuery();
+  const purchases = data?.purchasedCourses || [];
+  const totalRevenue = purchases.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const uniqueCourses = new Set(purchases.map((item) => item.courseId?._id).filter(Boolean)).size;
+  const chartData = purchases.map((item, index) => ({
+    name: item.courseId?.courseTitle?.slice(0, 12) || `Sale ${index + 1}`,
+    revenue: item.amount || 0,
   }));
 
+  if (isLoading) return <div className="grid min-h-[60vh] place-items-center text-[#8da098]">Preparing your studio…</div>;
+  if (isError) return <div className="grid min-h-[60vh] place-items-center text-[#ff9b8f]">We couldn’t load the studio data.</div>;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-4 bg-gray-900/10">
-      {/* Card: Total Sales */}
-      <Card className="w-full max-w-xs mx-auto bg-gray/30">
-        <CardHeader>
-          <CardTitle>Total Sales</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{totalSales}</p>
-        </CardContent>
-      </Card>
+    <div>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div><span className="eyebrow"><Sparkles size={14}/> Studio pulse</span><h1 className="mt-4 text-4xl font-extrabold tracking-[-.055em] text-[#f6f3de]">Good work has momentum.</h1><p className="muted-copy mt-2">A clean view of how your courses are performing.</p></div>
+        <div className="rounded-full border border-white/10 bg-white/[.03] px-4 py-2 text-xs text-[#8ea198]">Updated just now</div>
+      </div>
 
-      {/* Card: Total Revenue */}
-      <Card className="w-full max-w-xs mx-auto bg-gray/30">
-        <CardHeader>
-          <CardTitle>Total Revenue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">₹{totalRevenue.toFixed(2)}</p>
-        </CardContent>
-      </Card>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Metric icon={ShoppingBag} label="Course sales" value={purchases.length} note="Completed purchases"/>
+        <Metric icon={IndianRupee} label="Total revenue" value={`₹${totalRevenue.toLocaleString("en-IN")}`} note="Across all published courses"/>
+        <Metric icon={BookOpen} label="Active sellers" value={uniqueCourses} note="Courses with at least one sale"/>
+      </div>
 
-      {/* Card: Course Prices Chart */}
-     {
-      totalSales ?  <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 bg-gray-900/10">
-      <CardHeader>
-        <CardTitle className="text-xl font-semibold text-gray-300">
-          Course Prices
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={courseData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis
-              dataKey="name"
-              stroke="#6b7280"
-              angle={0}
-              textAnchor="end"
-              interval={1}
-              tick={{ fontSize: 12 }}
-            />
-            <YAxis stroke="#6b7280" className="bg-gray-900/10" tick={{ fontSize: 12 }} />
-            <Tooltip
-              className="bg-gray-900/10"
-              formatter={(value, name) => [`₹${value}`, name]}
-              contentStyle={{
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                borderRadius: '5px',
-                color: '#fff',
-              }}
-            />
-            <ReferenceLine y={0} stroke="#000" />
-            <Line
-              type="monotone"
-              dataKey="price"
-              stroke="url(#priceGradient)"
-              strokeWidth={3}
-              dot={{ stroke: "#4a90e2", strokeWidth: 2 }}
-              activeDot={{ r: 8 }}
-              animationDuration={1000}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card> :""
-     }
+      <section className="mt-5 rounded-[24px] border border-white/10 bg-[#10231e] p-5 md:p-7">
+        <div><p className="text-lg font-bold text-[#f6f3de]">Revenue rhythm</p><p className="mt-1 text-sm text-[#70877e]">Completed sales across your catalogue</p></div>
+        {chartData.length ? (
+          <div className="mt-8 h-[330px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.07)"/>
+                <XAxis dataKey="name" stroke="#60766d" tickLine={false} axisLine={false} fontSize={11}/>
+                <YAxis stroke="#60766d" tickLine={false} axisLine={false} fontSize={11}/>
+                <Tooltip contentStyle={{ background: "#07110f", border: "1px solid rgba(255,255,255,.1)", borderRadius: 16 }} formatter={(value) => [`₹${value}`, "Revenue"]}/>
+                <Line type="monotone" dataKey="revenue" stroke="#c9ff62" strokeWidth={3} dot={{ fill: "#07110f", stroke: "#c9ff62", strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }}/>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <div className="mt-8 grid h-[260px] place-items-center rounded-2xl border border-dashed border-white/10 text-sm text-[#6e857c]">Your first sale will start the chart.</div>}
+      </section>
     </div>
   );
 };
