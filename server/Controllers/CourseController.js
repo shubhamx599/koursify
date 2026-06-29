@@ -1,515 +1,461 @@
-const Course = require("../Modles/Course.js");
-const {deleteMedia, uploadMedia} = require("../utils/cloudinary.js")
-const Lecture = require ("../Modles/lecture.js")
+const prisma = require("../Config/prisma.js");
+const { uploadMedia, deleteMedia, deleteVideo } = require("../utils/cloudinary.js");
+
+const mapCourse = (c) => {
+  if (!c) return null;
+  return {
+    ...c,
+    _id: c.id,
+    creator: c.creator ? { ...c.creator, _id: c.creator.id } : null,
+    lectures: c.lectures ? c.lectures.map(l => ({ ...l, _id: l.id })) : []
+  };
+};
+
+const mapLecture = (l) => {
+  if (!l) return null;
+  return {
+    ...l,
+    _id: l.id,
+    course: l.course ? mapCourse(l.course) : null
+  };
+};
 
 const createCourse = async (req, res) => {
   try {
     const { courseTitle, category } = req.body;
+    const userId = req.userId;
+
     if (!courseTitle || !category) {
-      console.log("Missing required fields: courseTitle or category");
       return res.status(400).json({
-        message: "courseTitle and category are required",
+        message: "Course title and category are required.",
         success: false,
       });
     }
 
-    // Log the incoming request for creating a course
-    console.log(`Creating course: ${courseTitle} in category: ${category}`);
-
-    const course = await Course.create({
-      courseTitle,
-      category,
-      creator: req.tokenId,
+    const course = await prisma.course.create({
+      data: {
+        courseTitle,
+        category,
+        creatorId: userId,
+      },
     });
 
-    
-    console.log(`Course created successfully: ${course._id}`);
-
-    return res.status(200).json({
-      message: "Course is created successfully",
+    return res.status(201).json({
       success: true,
+      message: "Course created successfully.",
+      course: mapCourse(course),
     });
   } catch (error) {
-    
     console.error("Error creating course:", error);
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to create course",
       success: false,
     });
   }
 };
-const fetchCourse = async(req,res)=>{
-    try{
-        const userId = req.tokenId;
-        const courses = await Course.find({creator:userId});
-        if(!courses){
-            return res.status(404).json({
-                corses:[],
-                sucess:false,
-                message:"course not found",
 
-            })
-        }
-        return res.status(200).json({
-            courses,
-            message:"courses Found",
-            success:true,
-
-        })
-
-
-    }catch(error){
-        console.error("Error in fetcing course:", error);
-        res.status(500).json({
-          message: "Failed to Fetch course",
-          success: false,
-    })
-}
-}
-const editCourse = async (req, res) => {
+const getCreatorCourses = async (req, res) => {
   try {
-    console.log("Starting to update course...");
-
-    const { courseId } = req.params;
-    const { courseTitle, subTitle, description, category, courseLevel, coursePrice } = req.body;
-    const thumbnail = req.file; // multer uploads file as a buffer
-
-    console.log("Course ID:", courseId);
-    console.log("Incoming data:", {
-      courseTitle,
-      subTitle,
-      description,
-      category,
-      courseLevel,
-      coursePrice,
+    const userId = req.userId;
+    const courses = await prisma.course.findMany({
+      where: { creatorId: userId },
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        }
+      }
     });
 
-    let course = await Course.findById(courseId);
+    return res.status(200).json({
+      success: true,
+      courses: courses.map(mapCourse),
+    });
+  } catch (error) {
+    console.error("Error fetching creator courses:", error);
+    return res.status(500).json({
+      message: "Failed to fetch courses",
+      success: false,
+    });
+  }
+};
+
+const editCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { courseTitle, subTitle, description, category, courseLevel, coursePrice } = req.body;
+    const thumbnail = req.file;
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) {
-      console.log("Course not found:", courseId);
-      return res.status(404).json({ message: "Course not found", success: false });
+      return res.status(404).json({
+        message: "Course not found",
+        success: false,
+      });
     }
 
-    let courseThumbnail;
-    if (thumbnail) {
-      console.log("New thumbnail detected, uploading to Cloudinary...");
-
-      // Delete existing thumbnail if available
-      if (course.courseThumbnail) {
-        const publicId = course.courseThumbnail.split('/').pop().split('.')[0];
-        console.log("Deleting old thumbnail with public ID:", publicId);
-        await deleteMedia(publicId);
-      }
-
-      // Upload the new thumbnail to Cloudinary
-      const uploadResponse = await uploadMedia(thumbnail.buffer); // Use `buffer` instead of `path`
-      courseThumbnail = uploadResponse.secure_url;
-      console.log("Thumbnail uploaded successfully:", courseThumbnail);
-    }
-
-    // Prepare the update data dynamically
     const updateData = {};
     if (courseTitle) updateData.courseTitle = courseTitle;
     if (subTitle) updateData.subTitle = subTitle;
     if (description) updateData.description = description;
     if (category) updateData.category = category;
     if (courseLevel) updateData.courseLevel = courseLevel;
-    if (coursePrice) updateData.coursePrice = coursePrice;
-    if (courseThumbnail) updateData.courseThumbnail = courseThumbnail;
+    if (coursePrice !== undefined) {
+      updateData.coursePrice = coursePrice === "" ? null : parseFloat(coursePrice);
+    }
 
-    console.log("Updating course with data:", updateData);
+    if (thumbnail) {
+      if (course.courseThumbnail) {
+        try {
+          const urlParts = course.courseThumbnail.split('/');
+          const filename = urlParts[urlParts.length - 1];
+          const publicId = filename.split('.')[0];
+          await deleteMedia(publicId);
+        } catch (err) {
+          console.error("Failed to delete old thumbnail:", err);
+        }
+      }
+      const uploadResponse = await uploadMedia(thumbnail.buffer);
+      updateData.courseThumbnail = uploadResponse.secure_url;
+    }
 
-    // Update the course
-    course = await Course.findByIdAndUpdate(courseId, updateData, { new: true });
-
-    console.log("Course updated successfully:", course);
-
-    return res.status(200).json({
-      course,
-      message: "Course updated successfully",
+    const updatedCourse = await prisma.course.update({
+      where: { id: courseId },
+      data: updateData,
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        }
+      }
     });
 
+    return res.status(200).json({
+      success: true,
+      message: "Course updated successfully.",
+      course: mapCourse(updatedCourse),
+    });
   } catch (error) {
-    console.error("Error during course update:", error);
-
-    res.status(500).json({
-      message: "Failed to update course",
+    console.error("Error editing course:", error);
+    return res.status(500).json({
+      message: "Failed to edit course",
       success: false,
-      error: error.message,
     });
   }
 };
 
+const getCourseById = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        },
+        lectures: true
+      }
+    });
+
+    if (!course) {
+      return res.status(404).json({
+        message: "Course not found",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      course: mapCourse(course),
+    });
+  } catch (error) {
+    console.error("Error getting course by id:", error);
+    return res.status(500).json({
+      message: "Failed to fetch course",
+      success: false,
+    });
+  }
+};
 
 const removeCourse = async (req, res) => {
   try {
-    console.log("Starting course deletion...");
+    const { courseId } = req.params;
 
-    const courseId = req.params.courseId;
-    const userId = req.tokenId;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: { lectures: true }
+    });
 
-    console.log("Requested Course ID:", courseId);
-
-    // Find the course
-    const course = await Course.findById(courseId);
     if (!course) {
-      console.log("Course not found:", courseId);
       return res.status(404).json({
         message: "Course not found",
         success: false,
       });
     }
 
-    // Ensure the user is the creator of the course
-    if (course.creator.toString() !== userId) {
-      console.log("Unauthorized attempt to delete course:", courseId);
-      return res.status(403).json({
-        message: "Unauthorized to delete this course",
-        success: false,
-      });
-    }
-
-    // If there's a thumbnail, delete it
     if (course.courseThumbnail) {
-      const publicId = course.courseThumbnail.split("/").pop().split('.')[0];
-      console.log("Deleting thumbnail with public ID:", publicId);
-      await deleteMedia(publicId); // Assuming deleteMedia correctly handles media deletion
+      try {
+        const urlParts = course.courseThumbnail.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        const publicId = filename.split('.')[0];
+        await deleteMedia(publicId);
+      } catch (err) {
+        console.error("Failed to delete thumbnail:", err);
+      }
     }
 
-    // Delete the course
-    await Course.findByIdAndDelete(courseId);
-    console.log("Course deleted successfully:", courseId);
+    for (const lecture of course.lectures) {
+      if (lecture.publicId) {
+        try {
+          await deleteVideo(lecture.publicId);
+        } catch (err) {
+          console.error("Failed to delete lecture video:", err);
+        }
+      }
+    }
+
+    await prisma.course.delete({ where: { id: courseId } });
 
     return res.status(200).json({
-      message: "Course deleted successfully",
       success: true,
+      message: "Course removed successfully.",
     });
-
   } catch (error) {
-    console.error("Error deleting course:", error);
-
-    res.status(500).json({
-      message: "Failed to delete course",
+    console.error("Error removing course:", error);
+    return res.status(500).json({
+      message: "Failed to remove course",
       success: false,
     });
   }
 };
-const createLecture = async (req, res)=>{
+
+const createLecture = async (req, res) => {
   try {
-
-    const {lectureTitle} = req.body;
-    const {courseId} = req.params;
-
-    if(!lectureTitle || !courseId){
-      return res.status(400).json({
-        message:"Lecture title is required",
-        success:false,
-      })
-    }
-    const lecture = await Lecture.create({lectureTitle})
-    const course = await Course.findById(courseId);
-    if(course){
-      course.lectures.push(lecture._id);
-      await course.save();
-    }
-    return res.status(201).json({
-      lecture,
-      message:"lecture created successfully"
-    })
-
-
-    
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      message: "Failed create course",
-      success: false,
-    });
-
-    
-  }
-}
-const getLectures = async (req, res) => {
-  try {
-    console.log("Received request to fetch lectures for course:", req.params);
-
+    const { lectureTitle } = req.body;
     const { courseId } = req.params;
-    const course = await Course.findById(courseId).populate({
-      path: "lectures",
-      select: "lectureTitle videoUrl isPreviewFree", // Include videoUrl explicitly
-    });
 
+    if (!lectureTitle) {
+      return res.status(400).json({
+        message: "Lecture title is required",
+        success: false,
+      });
+    }
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) {
-      console.warn(`Course not found for courseId: ${courseId}`);
       return res.status(404).json({
         message: "Course not found",
         success: false,
       });
     }
 
-    console.log(`Course found: ${courseId}, Number of lectures: ${course.lectures.length}`);
+    const lecture = await prisma.lecture.create({
+      data: {
+        lectureTitle,
+        courseId
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Lecture created successfully.",
+      lecture: mapLecture(lecture)
+    });
+  } catch (error) {
+    console.error("Error creating lecture:", error);
+    return res.status(500).json({
+      message: "Failed to create lecture",
+      success: false,
+    });
+  }
+};
+
+const getCourseLecture = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: { lectures: true }
+    });
+
+    if (!course) {
+      return res.status(404).json({
+        message: "Course not found",
+        success: false,
+      });
+    }
 
     return res.status(200).json({
-      message: "Course and lectures found",
       success: true,
-      lectures: course.lectures,
+      lectures: course.lectures.map(mapLecture)
     });
-  } catch (e) {
-    console.error("Error fetching lectures:", e);
-
-    res.status(500).json({
+  } catch (error) {
+    console.error("Error fetching course lectures:", error);
+    return res.status(500).json({
       message: "Failed to fetch lectures",
       success: false,
     });
   }
 };
-const updateLecture = async (req, res) => {
+
+const editLecture = async (req, res) => {
   try {
-    console.log("Received request to update lecture:", req.body, req.params);
+    const { lectureId } = req.params;
+    const { lectureTitle, videoInfo, isPreviewFree } = req.body;
 
-    const { lectureTitle, isPreviewFree, videoInfo } = req.body;
-    const { courseId, lectureId } = req.params;
-
-    // Find the lecture
-    console.log(`Finding lecture with ID: ${lectureId}`);
-    const lecture = await Lecture.findById(lectureId);
-
+    const lecture = await prisma.lecture.findUnique({ where: { id: lectureId } });
     if (!lecture) {
-      console.log("Lecture not found!");
       return res.status(404).json({
         message: "Lecture not found",
         success: false,
       });
     }
 
-    console.log("Lecture found:", lecture);
+    const updateData = {};
+    if (lectureTitle) updateData.lectureTitle = lectureTitle;
+    if (videoInfo?.videoUrl) updateData.videoUrl = videoInfo.videoUrl;
+    if (videoInfo?.publicId) updateData.publicId = videoInfo.publicId;
+    if (isPreviewFree !== undefined) updateData.isPreviewFree = isPreviewFree;
 
-    // Check if a new video is being uploaded
-    if (videoInfo?.videoUrl && videoInfo?.publicId) {
-      if (lecture.publicId) {
-        console.log("Deleting old video:", lecture.publicId);
-        await deleteVideo(lecture.publicId); // Delete previous video from Cloudinary
-      }
-
-      console.log("Uploading new video...");
-      const uploadResponse = await uploadMedia(videoInfo.videoUrl);
-      if (uploadResponse) {
-        lecture.videoUrl = uploadResponse.secure_url;
-        lecture.publicId = uploadResponse.public_id;
-        console.log("New video uploaded:", uploadResponse.secure_url);
+    if (videoInfo?.videoUrl && lecture.publicId) {
+      try {
+        await deleteVideo(lecture.publicId);
+      } catch (err) {
+        console.error("Failed to delete old video:", err);
       }
     }
 
-    // Update other lecture details if provided
-    if (lectureTitle) {
-      lecture.lectureTitle = lectureTitle;
-      console.log("Updated lectureTitle:", lectureTitle);
-    }
-    if (typeof isPreviewFree !== "undefined") {
-      lecture.isPreviewFree = isPreviewFree;
-      console.log("Updated isPreviewFree:", isPreviewFree);
-    }
-
-    // Save the updated lecture
-    await lecture.save();
-    console.log("Lecture updated successfully.");
-
-    // Find the course and add lecture if missing
-    console.log(`Finding course with ID: ${courseId}`);
-    const course = await Course.findById(courseId);
-
-    if (course && !course.lectures.includes(lecture._id)) {
-      course.lectures.push(lecture._id);
-      await course.save();
-      console.log("Lecture added to course:", courseId);
-    }
-
-    return res.status(200).json({
-      lecture,
-      message: "Lecture updated successfully",
-      success: true,
+    const updatedLecture = await prisma.lecture.update({
+      where: { id: lectureId },
+      data: updateData
     });
 
+    return res.status(200).json({
+      success: true,
+      message: "Lecture updated successfully.",
+      lecture: mapLecture(updatedLecture)
+    });
   } catch (error) {
-    console.error("Error updating lecture:", error);
-    res.status(500).json({
-      message: "Failed to update the lecture",
+    console.error("Error editing lecture:", error);
+    return res.status(500).json({
+      message: "Failed to edit lecture",
       success: false,
     });
   }
 };
 
-const removeLecture = async(req,res) =>{
-  try{
-    const {lectureId} = req.params;
-    const lecture = await Lecture.findByIdAndDelete(lectureId);
-
-    if(!lecture){
-      
-      return res.status(404).json({
-          message:"Lecture not find",
-          success:false
-        })
-      
-    }
-    if(lecture.publicId){
-      await deleteMedia(lecture.publicId)
-    }
-    await Course.updateOne(
-      {
-        lectures:lectureId
-
-      },
-      {
-        $pull:{
-          lectures:lectureId
-        }
-      }
-    )
-    return res.status(200).json({
-      message:"Lecture removed successfully",
-      success:true,
-    })
-  }catch(e){
-    console.log(e);
-    res.status(500).json({
-      message:"Failed to remove the course",
-      success:false
-    })
-  }
-}
-const getLectureById = async (req,res) =>{
-  try{
-    const {lectureId} = req.params;
-    const lecture = await Lecture.findByIdAndDelete(lectureId);
-
-    if(!lecture){
-      
-      return res.status(404).json({
-          message:"Lecture not find",
-          success:false
-        })
-      
-    }
-    
-    return res.status(200).json({
-      lecture,
-      success:true,
-      message:"lecture found"
-    })
-
-
-
-  }catch(e){
-    console.log(e);
-    res.status(500).json({
-      message:"Failed to get the course",
-      success:false
-    })
-  }
-}
-
-const publishCourse = async(req,res) =>{
-    try{
-      const {courseId} = req.params;
-      const {publish} = req.query;
-
-      const course = await Course.findById(courseId);
-
-      if(!course){
-        return res.status(404).json({
-          message:"course not found",
-          success:false,
-        })
-      }
-
-      course.isPublished = publish === "true";
-
-      
-
-      await course.save();
-      const toastMsg = course.isPublished ? "publised" :"Unpublished"
-      return res.status(200).json({
-        message: `course is ${toastMsg}`,
-        success:true,
-        
-
-      })
-
-
-
-    } catch(e){
-      return res.status(500).json({
-        message:"Failed to update status"
-      })
-
-    } 
-}
-
-const getCourseById = async (req, res) => {
+const removeLecture = async (req, res) => {
   try {
-    const { courseId } = req.params;
+    const { lectureId } = req.params;
 
-    console.log(`🔍 Attempting to fetch course with ID: ${courseId}`);
-
-    // Attempt to retrieve the course from the database
-    const course = await Course.findById(courseId);
-
-    if (!course) {
-      console.warn(`⚠️ No course found with ID: ${courseId}`);
+    const lecture = await prisma.lecture.findUnique({ where: { id: lectureId } });
+    if (!lecture) {
       return res.status(404).json({
-        message: "There is no course",
+        message: "Lecture not found",
         success: false,
       });
     }
 
-    console.log(`✅ Course with ID: ${courseId} found successfully`);
-    return res.status(200).json({
-      message: "Course found successfully",
-      success: true,
-      course,
-    });
+    if (lecture.publicId) {
+      try {
+        await deleteVideo(lecture.publicId);
+      } catch (err) {
+        console.error("Failed to delete video:", err);
+      }
+    }
 
+    await prisma.lecture.delete({ where: { id: lectureId } });
+
+    return res.status(200).json({
+      success: true,
+      message: "Lecture removed successfully."
+    });
   } catch (error) {
-    console.error("🚨 Error fetching course:", error.message || error);
+    console.error("Error removing lecture:", error);
     return res.status(500).json({
-      message: "An error occurred while retrieving the course.",
+      message: "Failed to remove lecture",
       success: false,
     });
   }
 };
 
-const getPublishCourse = async (req, res) => {
-  console.log("🚀 Fetching published courses...");
-
+const getLectureById = async (req, res) => {
   try {
-    // Fetch courses from database
-    const courses = await Course.find({ isPublished: true }).populate({
-      path: "creator",
-      select: "email photoUrl",
+    const { lectureId } = req.params;
+    const lecture = await prisma.lecture.findUnique({
+      where: { id: lectureId }
     });
 
-    // Check if courses exist
-    if (!courses || courses.length === 0) {
-      console.log("No published courses found.");
+    if (!lecture) {
+      return res.status(404).json({
+        message: "Lecture not found",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      lecture: mapLecture(lecture)
+    });
+  } catch (error) {
+    console.error("Error getting lecture by id:", error);
+    return res.status(500).json({
+      message: "Failed to fetch lecture",
+      success: false,
+    });
+  }
+};
+
+const publishCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { publish } = req.query;
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
       return res.status(404).json({
         message: "Course not found",
         success: false,
       });
     }
 
-    // Successful fetch
-    console.log(`${courses.length} published courses found.`);
+    const isPublished = publish === "true";
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { isPublished }
+    });
+
     return res.status(200).json({
-      message: "Course found",
       success: true,
-      courses,
+      message: isPublished ? "Course published successfully." : "Course unpublished successfully."
     });
   } catch (error) {
-    // Log error details
-    console.error("🚨 Error fetching courses:", error.message || error);
+    console.error("Error publishing course:", error);
     return res.status(500).json({
-      message: "An error occurred while retrieving the published course.",
+      message: "Failed to update publish status",
+      success: false,
+    });
+  }
+};
+
+const getPublishedCourse = async (req, res) => {
+  try {
+    const courses = await prisma.course.findMany({
+      where: { isPublished: true },
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        },
+        lectures: true
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      courses: courses.map(mapCourse),
+    });
+  } catch (error) {
+    console.error("Error getting published courses:", error);
+    return res.status(500).json({
+      message: "Failed to fetch published courses",
       success: false,
     });
   }
@@ -517,65 +463,66 @@ const getPublishCourse = async (req, res) => {
 
 const searchCourse = async (req, res) => {
   try {
-    // Destructure query parameters with default values
-    const { query = "", categories = [], sortByPrice = "low" } = req.query;
+    const { query = "", sortByPrice = "low" } = req.query;
+    const categories = Array.isArray(req.query.categories)
+      ? req.query.categories
+      : (req.query.categories || "").split(",").filter(Boolean);
 
-    // Log incoming query parameters
-    console.log("Incoming query parameters:", { query, categories, sortByPrice });
-
-    // Construct search criteria for MongoDB
-    const search = {
+    const whereClause = {
       isPublished: true,
-      $or: [
-        { courseTitle: { $regex: query, $options: "i" } },
-        { subTitle: { $regex: query, $options: "i" } },
-        { category: { $regex: query, $options: "i" } }
+      OR: [
+        { courseTitle: { contains: query, mode: 'insensitive' } },
+        { subTitle: { contains: query, mode: 'insensitive' } },
+        { category: { contains: query, mode: 'insensitive' } }
       ]
     };
 
-    // Add category filter if categories are provided
     if (categories.length > 0) {
-      search.category = { $in: categories }; // Use $in for array matching
+      whereClause.category = { in: categories };
     }
 
-    // Set sorting options for price
-    const sortOptions = {};
-    if (sortByPrice === "low") {
-      sortOptions.coursePrice = 1; // Ascending order
-    } else if (sortByPrice === "high") {
-      sortOptions.coursePrice = -1; // Descending order
-    }
-
-    // Log the sort options
-    console.log("Sorting options:", sortOptions);
-
-    // Fetch courses from the database
-    let courses = await Course.find(search)
-      .populate({ path: "creator", select: "email photoUrl" }) // Populate creator details
-      .sort(sortOptions); // Sort by price
-
-    // Log the fetched courses
-    console.log("Courses found:", courses);
-
-    // Return response
-    return res.status(200).json({
-      success: true,
-      courses: courses || [] // Ensure it returns an empty array if no courses found
+    const courses = await prisma.course.findMany({
+      where: whereClause,
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        },
+        lectures: true
+      },
+      orderBy: {
+        coursePrice: sortByPrice === "low" ? "asc" : "desc"
+      }
     });
 
+    return res.status(200).json({
+      success: true,
+      courses: courses.map(mapCourse)
+    });
   } catch (error) {
-    // Log error for debugging purposes
-    console.error("Error fetching courses:", error);
-
-    // Return error response
+    console.error("Error searching courses:", error);
     return res.status(500).json({
       success: false,
-      message: "An error occurred while fetching courses.",
+      message: "Failed to search courses"
     });
   }
 };
 
-
-
-
-module.exports = {publishCourse, createCourse,fetchCourse,editCourse,createLecture,getLectures,removeLecture,getLectureById ,updateLecture,removeCourse,getCourseById,getPublishCourse,searchCourse };
+module.exports = {
+  createCourse,
+  getCreatorCourses,
+  fetchCourse: getCreatorCourses,
+  editCourse,
+  getCourseById,
+  removeCourse,
+  createLecture,
+  getCourseLecture,
+  getLectures: getCourseLecture,
+  editLecture,
+  updateLecture: editLecture,
+  removeLecture,
+  getLectureById,
+  publishCourse,
+  getPublishedCourse,
+  getPublishCourse: getPublishedCourse,
+  searchCourse,
+};

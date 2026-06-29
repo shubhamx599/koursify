@@ -1,6 +1,6 @@
 // server/Routes/purchaseCourseRoute.js
 const express = require('express');
-const {isAuthenticated} = require("../MIddlewares/isAuthenticated.js");
+const {isAuthenticated, requireInstructor} = require("../MIddlewares/isAuthenticated.js");
 const { 
   createRazorpayOrder, 
   verifyRazorpayPayment, 
@@ -18,6 +18,6 @@ router.post("/verify-razorpay-payment", isAuthenticated, verifyRazorpayPayment);
 // Other Routes (Unchanged)
 router.get("/course/:courseId/course-status", isAuthenticated, getCourseDetail);
 router.get("/get-all-purchase-course", isAuthenticated, getAllPurchaseCourse);
-router.get("/get-purchase-course-admin", isAuthenticated, getAdminCreatedAndPurchasedCourses);
+router.get("/get-purchase-course-admin", isAuthenticated, requireInstructor, getAdminCreatedAndPurchasedCourses);
 
 module.exports = router;

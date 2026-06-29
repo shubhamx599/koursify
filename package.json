@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "nodemon server/index.js",
     "build": "npm install && npm install --prefix client && npm run build --prefix client",
-    "start": "nodemon server/index.js"
+    "start": "node server/index.js"
   },
   "keywords": [],
   "author": "Shubham Kumar",
   "license": "ISC",
   "description": "Online Learning Platform - Koursify",
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",
@@ -26,5 +27,8 @@
     "razorpay": "^2.9.6",
     "sharp": "^0.33.5",
     "streamifier": "^0.1.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3"
   }
 }

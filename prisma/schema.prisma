@@ -1,0 +1,130 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  instructor
+  student
+}
+
+enum CourseLevel {
+  Beginner
+  Medium
+  Advance
+}
+
+enum PurchaseStatus {
+  pending
+  completed
+  failed
+}
+
+model User {
+  id             String           @id @default(uuid())
+  name           String           @default("")
+  email          String           @unique
+  password       String
+  role           Role             @default(student)
+  photoUrl       String           @default("")
+  photoPublicId  String           @default("")
+  
+  // Relations
+  createdCourses Course[]         @relation("CourseCreator")
+  enrolledCourses Course[]        @relation("CourseEnrollments")
+  purchases      CoursePurchase[]
+  progress       CourseProgress[]
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Course {
+  id               String             @id @default(uuid())
+  courseTitle      String
+  subTitle         String?
+  description      String?
+  category         String?
+  courseLevel      CourseLevel        @default(Beginner)
+  coursePrice      Float?
+  courseThumbnail  String?
+  isPublished      Boolean            @default(false)
+  
+  // Relations
+  creatorId        String
+  creator          User               @relation("CourseCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  lectures         Lecture[]
+  enrolledStudents User[]             @relation("CourseEnrollments")
+  purchases        CoursePurchase[]
+  progress         CourseProgress[]
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model Lecture {
+  id             String           @id @default(uuid())
+  lectureTitle   String
+  videoUrl       String?
+  publicId       String           @default("")
+  isPreviewFree  Boolean          @default(false)
+  
+  // Relations
+  courseId       String
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lectureProgress LectureProgress[]
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model CourseProgress {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  completed       Boolean           @default(false)
+  lectureProgress LectureProgress[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([userId, courseId])
+}
+
+model LectureProgress {
+  id               String         @id @default(uuid())
+  lectureId        String
+  lecture          Lecture        @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  viewed           Boolean        @default(false)
+  courseProgressId String
+  courseProgress   CourseProgress @relation(fields: [courseProgressId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([courseProgressId, lectureId])
+}
+
+model CoursePurchase {
+  id        String         @id @default(uuid())
+  amount    Float
+  status    PurchaseStatus @default(pending)
+  orderId   String         @unique
+  paymentId String         @default("")
+  
+  // Relations
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}

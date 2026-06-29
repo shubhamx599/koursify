@@ -1,34 +1,53 @@
-const CourseProgress = require("../Modles/progress.js")
-const Course = require("../Modles/Course.js")
+const prisma = require("../Config/prisma.js");
+
+const mapCourse = (c) => {
+  if (!c) return null;
+  return {
+    ...c,
+    _id: c.id,
+    lectures: c.lectures ? c.lectures.map(l => ({ ...l, _id: l.id })) : []
+  };
+};
 
 const getCourseProgress = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    console.log("getCourseProgress called");
     console.log(`Fetching progress for user: ${userId}, course: ${courseId}`);
 
     // Step-1: Fetch the user's course progress
-    let courseProgress = await CourseProgress.findOne({ courseId, userId }).populate("courseId");
+    const courseProgress = await prisma.courseProgress.findUnique({
+      where: {
+        userId_courseId: { userId, courseId }
+      },
+      include: {
+        lectureProgress: true
+      }
+    });
 
-    console.log("Fetched course progress:", courseProgress);
-
-    // Fetch course details
-    const courseDetails = await Course.findById(courseId).populate("lectures");
-    console.log("Fetched course details:", courseDetails);
+    // Fetch course details with lectures if user is enrolled
+    const courseDetails = await prisma.course.findFirst({
+      where: {
+        id: courseId,
+        enrolledStudents: {
+          some: { id: userId }
+        }
+      },
+      include: {
+        lectures: true
+      }
+    });
 
     if (!courseDetails) {
-      console.log("Course not found");
-      return res.status(404).json({ message: "Course not found" });
+      return res.status(403).json({ message: "Purchase this course to access its content" });
     }
 
     // Step-2: If no progress found, return course details with an empty progress
     if (!courseProgress) {
-      console.log("No progress found. Returning empty progress.");
       return res.status(200).json({
         data: {
-          courseDetails,
+          courseDetails: mapCourse(courseDetails),
           progress: [],
           completed: false,
         },
@@ -36,11 +55,16 @@ const getCourseProgress = async (req, res) => {
     }
 
     // Step-3: Return the user's course progress along with course details
-    console.log("Returning user course progress");
+    const mappedProgress = courseProgress.lectureProgress.map(lp => ({
+      lectureId: lp.lectureId,
+      viewed: lp.viewed,
+      _id: lp.id
+    }));
+
     return res.status(200).json({
       data: {
-        courseDetails,
-        progress: courseProgress.lectureProgress,
+        courseDetails: mapCourse(courseDetails),
+        progress: mappedProgress,
         completed: courseProgress.completed,
       },
     });
@@ -50,65 +74,74 @@ const getCourseProgress = async (req, res) => {
   }
 };
 
-   
 const updateLectureProgress = async (req, res) => {
   try {
     const { courseId, lectureId } = req.params;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    console.log("Received request to update progress");
-    console.log("User ID:", userId);
-    console.log("Course ID:", courseId);
-    console.log("Lecture ID:", lectureId);
+    const course = await prisma.course.findFirst({
+      where: {
+        id: courseId,
+        enrolledStudents: {
+          some: { id: userId }
+        }
+      },
+      include: {
+        lectures: true
+      }
+    });
+
+    if (!course) {
+      return res.status(403).json({
+        message: "Purchase this course before recording progress",
+      });
+    }
+
+    if (!course.lectures.some((lecture) => lecture.id === lectureId)) {
+      return res.status(400).json({
+        message: "Lecture does not belong to this course",
+      });
+    }
 
     // Fetch or create course progress
-    let courseProgress = await CourseProgress.findOne({ courseId, userId });
+    const courseProgress = await prisma.courseProgress.upsert({
+      where: { userId_courseId: { userId, courseId } },
+      create: { userId, courseId, completed: false },
+      update: {}
+    });
 
-    if (!courseProgress) {
-      console.log("No progress found, creating new record...");
-      courseProgress = new CourseProgress({
-        userId,
-        courseId,
-        completed: false,
-        lectureProgress: [],
-      });
-    } else {
-      console.log("Existing course progress found:", courseProgress);
-    }
-
-    // Find the lecture progress in the course progress
-    const lectureIndex = courseProgress.lectureProgress.findIndex(
-      (lecture) => lecture.lectureId === lectureId
-    );
-
-    if (lectureIndex !== -1) {
-      console.log(`Lecture ${lectureId} already exists, updating status to viewed`);
-      courseProgress.lectureProgress[lectureIndex].viewed = true;
-    } else {
-      console.log(`Lecture ${lectureId} not found, adding new lecture progress`);
-      courseProgress.lectureProgress.push({
+    // Record lecture progress
+    await prisma.lectureProgress.upsert({
+      where: {
+        courseProgressId_lectureId: {
+          courseProgressId: courseProgress.id,
+          lectureId
+        }
+      },
+      create: {
+        courseProgressId: courseProgress.id,
         lectureId,
-        viewed: true,
-      });
-    }
+        viewed: true
+      },
+      update: {
+        viewed: true
+      }
+    });
 
     // Check if all lectures are completed
-    const lectureProgressLength = courseProgress.lectureProgress.filter(
-      (lectureProg) => lectureProg.viewed
-    ).length;
+    const completedLecturesCount = await prisma.lectureProgress.count({
+      where: {
+        courseProgressId: courseProgress.id,
+        viewed: true
+      }
+    });
 
-    console.log("Completed Lectures Count:", lectureProgressLength);
-
-    const course = await Course.findById(courseId);
-    console.log("Course Details:", course);
-
-    if (course.lectures.length === lectureProgressLength) {
-      console.log("All lectures completed. Marking course as completed.");
-      courseProgress.completed = true;
+    if (course.lectures.length === completedLecturesCount) {
+      await prisma.courseProgress.update({
+        where: { id: courseProgress.id },
+        data: { completed: true }
+      });
     }
-
-    await courseProgress.save();
-    console.log("Progress saved successfully");
 
     return res.status(200).json({
       message: "Lecture progress updated successfully.",
@@ -122,25 +155,41 @@ const updateLectureProgress = async (req, res) => {
 const markAsCompleted = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    console.log(`Received request to mark course ${courseId} as completed for user ${userId}`);
-
-    const courseProgress = await CourseProgress.findOne({ courseId, userId });
-    if (!courseProgress) {
-      console.error(`Course progress not found for courseId: ${courseId} and userId: ${userId}`);
-      return res.status(404).json({ message: "Course progress not found" });
+    const enrolled = await prisma.course.findFirst({
+      where: { id: courseId, enrolledStudents: { some: { id: userId } } }
+    });
+    if (!enrolled) {
+      return res.status(403).json({ message: "Purchase this course first" });
     }
 
-    console.log(`Marking all lecture progress as viewed for courseId: ${courseId}`);
-    courseProgress.lectureProgress.map(
-      (lectureProgress) => (lectureProgress.viewed = true)
-    );
+    const courseProgress = await prisma.courseProgress.upsert({
+      where: { userId_courseId: { userId, courseId } },
+      create: { userId, courseId, completed: true },
+      update: { completed: true }
+    });
 
-    courseProgress.completed = true;
-    await courseProgress.save();
+    const lectures = await prisma.lecture.findMany({ where: { courseId } });
+    for (const lecture of lectures) {
+      await prisma.lectureProgress.upsert({
+        where: {
+          courseProgressId_lectureId: {
+            courseProgressId: courseProgress.id,
+            lectureId: lecture.id
+          }
+        },
+        create: {
+          courseProgressId: courseProgress.id,
+          lectureId: lecture.id,
+          viewed: true
+        },
+        update: {
+          viewed: true
+        }
+      });
+    }
 
-    console.log(`Course ${courseId} marked as completed successfully.`);
     return res.status(200).json({ message: "Course marked as completed." });
   } catch (error) {
     console.error("Error in marking course as completed:", error);
@@ -151,25 +200,41 @@ const markAsCompleted = async (req, res) => {
 const markAsInCompleted = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    console.log(`Received request to mark course ${courseId} as incomplete for user ${userId}`);
-
-    const courseProgress = await CourseProgress.findOne({ courseId, userId });
-    if (!courseProgress) {
-      console.error(`Course progress not found for courseId: ${courseId} and userId: ${userId}`);
-      return res.status(404).json({ message: "Course progress not found" });
+    const enrolled = await prisma.course.findFirst({
+      where: { id: courseId, enrolledStudents: { some: { id: userId } } }
+    });
+    if (!enrolled) {
+      return res.status(403).json({ message: "Purchase this course first" });
     }
 
-    console.log(`Marking all lecture progress as not viewed for courseId: ${courseId}`);
-    courseProgress.lectureProgress.map(
-      (lectureProgress) => (lectureProgress.viewed = false)
-    );
+    const courseProgress = await prisma.courseProgress.upsert({
+      where: { userId_courseId: { userId, courseId } },
+      create: { userId, courseId, completed: false },
+      update: { completed: false }
+    });
 
-    courseProgress.completed = false;
-    await courseProgress.save();
+    const lectures = await prisma.lecture.findMany({ where: { courseId } });
+    for (const lecture of lectures) {
+      await prisma.lectureProgress.upsert({
+        where: {
+          courseProgressId_lectureId: {
+            courseProgressId: courseProgress.id,
+            lectureId: lecture.id
+          }
+        },
+        create: {
+          courseProgressId: courseProgress.id,
+          lectureId: lecture.id,
+          viewed: false
+        },
+        update: {
+          viewed: false
+        }
+      });
+    }
 
-    console.log(`Course ${courseId} marked as incomplete successfully.`);
     return res.status(200).json({ message: "Course marked as incompleted." });
   } catch (error) {
     console.error("Error in marking course as incomplete:", error);
@@ -177,5 +242,4 @@ const markAsInCompleted = async (req, res) => {
   }
 };
 
-
-  module.exports = {getCourseProgress,updateLectureProgress,markAsCompleted,markAsInCompleted}
+module.exports = { getCourseProgress, updateLectureProgress, markAsCompleted, markAsInCompleted };

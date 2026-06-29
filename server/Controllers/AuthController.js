@@ -1,5 +1,4 @@
-// server/Controllers/AuthController.js - COMPLETE REPLACE
-const userModel = require("../Modles/userModel.js");
+const prisma = require("../Config/prisma.js");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { deleteMedia, uploadMedia } = require("../utils/cloudinary.js");
@@ -15,7 +14,7 @@ const register = async (req, res) => {
             });
         }
 
-        const user = await userModel.findOne({ email });
+        const user = await prisma.user.findUnique({ where: { email } });
         if (user) {
             return res.status(400).json({
                 success: false,
@@ -23,18 +22,21 @@ const register = async (req, res) => {
             });
         }
 
+        const userRole = role === "instructor" ? "instructor" : "student";
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await userModel.create({
-            email,
-            password: hashedPassword,
-            role: role || "student",
+        const newUser = await prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                role: userRole,
+            }
         });
 
         return res.status(201).json({
             success: true,
             message: "Account created successfully!",
             user: {
-                id: newUser._id,
+                id: newUser.id,
                 email: newUser.email,
                 role: newUser.role,
             },
@@ -59,7 +61,7 @@ const login = async (req, res) => {
             });
         }
 
-        const user = await userModel.findOne({ email });
+        const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
             return res.status(400).json({
                 success: false,
@@ -75,7 +77,6 @@ const login = async (req, res) => {
             });
         }
         
-        // ✅ FIXED: Use JWT_SECRET (not JWT_SECRET_KEY)
         const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_KEY;
         
         if (!jwtSecret) {
@@ -85,16 +86,15 @@ const login = async (req, res) => {
             });
         }
         
-        const token = jwt.sign({ id: user._id }, jwtSecret, { 
+        const token = jwt.sign({ id: user.id }, jwtSecret, { 
             expiresIn: "7d" 
         });
         
-        // ✅ SIMPLIFIED RESPONSE - Remove cookie complexity
         return res.status(200).json({
             success: true,
             message: `Welcome back ${user.email}`,
             user: {
-                id: user._id,
+                id: user.id,
                 email: user.email,
                 role: user.role
             },
@@ -127,11 +127,31 @@ const logout = (req, res) => {
 
 const getUserProfile = async (req, res) => {
     try {
-        const userId = req.userId; // ✅ FIXED: Changed from tokenId to userId
+        const userId = req.userId;
         
-        const user = await userModel
-            .findById(userId)
-            .select("-password");
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                photoUrl: true,
+                photoPublicId: true,
+                enrolledCourses: {
+                    include: {
+                        creator: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                photoUrl: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         if (!user) {
             return res.status(404).json({
@@ -140,10 +160,20 @@ const getUserProfile = async (req, res) => {
             });
         }
 
+        const userWithMongoId = {
+            ...user,
+            _id: user.id,
+            enrolledCourses: user.enrolledCourses.map(course => ({
+                ...course,
+                _id: course.id,
+                creator: course.creator ? { ...course.creator, _id: course.creator.id } : null
+            }))
+        };
+
         return res.status(200).json({
             message: "Profile found",
             success: true,
-            user,
+            user: userWithMongoId,
         });
 
     } catch (e) {
@@ -155,16 +185,12 @@ const getUserProfile = async (req, res) => {
     }
 };
 
-// ✅ ADDED: editProfile function (SIMPLIFIED VERSION)
 const editProfile = async (req, res) => {
     try {
         const userId = req.userId;
         const { name } = req.body;
 
-        console.log("🔄 Editing profile for user:", userId);
-        console.log("📝 New name:", name);
-
-        const user = await userModel.findById(userId);
+        const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) {
             return res.status(404).json({
                 message: "Profile not found",
@@ -172,18 +198,42 @@ const editProfile = async (req, res) => {
             });
         }
 
-        // Simple update - only name for now
-        const updatedUser = await userModel.findByIdAndUpdate(
-            userId, 
-            { name }, 
-            { new: true }
-        ).select("-password");
+        const updateData = {};
+        if (typeof name === "string") {
+            updateData.name = name.trim();
+        }
 
-        console.log("✅ Profile updated successfully");
+        if (req.file) {
+            const uploadResponse = await uploadMedia(req.file.buffer);
+            updateData.photoUrl = uploadResponse.secure_url;
+            updateData.photoPublicId = uploadResponse.public_id;
+
+            if (user.photoPublicId) {
+                await deleteMedia(user.photoPublicId);
+            }
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: updateData,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                photoUrl: true,
+                photoPublicId: true
+            }
+        });
+
+        const userWithMongoId = {
+            ...updatedUser,
+            _id: updatedUser.id
+        };
 
         return res.status(200).json({
             success: true,
-            updatedUser,
+            updatedUser: userWithMongoId,
             message: "Profile updated successfully",
         });
 
@@ -197,5 +247,4 @@ const editProfile = async (req, res) => {
     }
 };
 
-// ✅ FIXED: Now includes editProfile in exports
 module.exports = { register, login, getUserProfile, logout, editProfile };

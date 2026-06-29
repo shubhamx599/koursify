@@ -30,15 +30,6 @@ app.use(
 const port = process.env.PORT || 5000;
 const _dirname = path.resolve();
 
-const razorpay = require("./utils/razorpay");
-
-// Test Razorpay connection on server start
-razorpay.testConnection();
-
-// Connect to the database
-console.log("🔄 Attempting to connect to the database...");
-connectToDb();
-
 app.use("/api/user", userRouter);
 app.use("/api/course", courseRouter);
 app.use("/api/media", mediaRouter);
@@ -48,6 +39,16 @@ app.use(express.static(path.join(_dirname, "/client/dist")));
 app.get("*", (_, res) => {
   res.sendFile(path.resolve(_dirname, "client", "dist", "index.html"));
 });
-app.listen(port, () => {
-  console.log(`🚀 Server is up and running on port ${port}`);
+const startServer = async () => {
+  console.log("🔄 Attempting to connect to the database...");
+  await connectToDb();
+
+  app.listen(port, () => {
+    console.log(`🚀 Server is up and running on port ${port}`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error("Server startup failed:", error.message);
+  process.exitCode = 1;
 });

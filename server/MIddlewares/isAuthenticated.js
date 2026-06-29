@@ -1,5 +1,6 @@
 // server/MIddlewares/isAuthenticated.js
 const jwt = require("jsonwebtoken");
+const prisma = require("../Config/prisma.js");
 
 const isAuthenticated = async (req, res, next) => {
   try {
@@ -29,7 +30,7 @@ const isAuthenticated = async (req, res, next) => {
 
     const decode = jwt.verify(token, jwtSecret);
 
-    req.userId = decode.id; // ✅ FIXED: Changed from tokenId to userId
+    req.userId = decode.id;
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
@@ -53,4 +54,34 @@ const isAuthenticated = async (req, res, next) => {
   }
 };
 
-module.exports = { isAuthenticated };
+const requireInstructor = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "User account not found",
+        success: false,
+      });
+    }
+
+    if (user.role !== "instructor") {
+      return res.status(403).json({
+        message: "Instructor access required",
+        success: false,
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      message: "Unable to verify instructor access",
+      success: false,
+    });
+  }
+};
+
+module.exports = { isAuthenticated, requireInstructor };

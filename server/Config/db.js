@@ -1,15 +1,13 @@
-const mongoose = require("mongoose");
+const prisma = require("./prisma.js");
 
 const connectToDb = async () => {
     try {
-        if (!process.env.MONGO_URI) {
-            throw new Error("MONGO_URI is not defined in environment variables.");
-        }
-
-        await mongoose.connect(process.env.MONGO_URI); // Removed deprecated options
-        console.log("✅ Database connected successfully!");
+        console.log("🔄 Attempting to connect to PostgreSQL database via Prisma...");
+        await prisma.$connect();
+        console.log("✅ Database connected successfully via Prisma!");
     } catch (error) {
         console.error("❌ Failed to connect to the database. Error:", error.message);
+        throw error;
     }
 };
 

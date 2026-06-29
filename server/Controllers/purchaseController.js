@@ -1,42 +1,56 @@
-// server/Controllers/purchaseController.js
 const razorpay = require("../utils/razorpay");
-const Course = require("../Modles/Course.js");
-const CoursePurchase = require("../Modles/coursePurchased.js");
-const User = require("../Modles/userModel.js");
-const Lecture = require("../Modles/lecture.js");
-const coursePurchased = require("../Modles/coursePurchased.js");
+const prisma = require("../Config/prisma.js");
+const crypto = require("crypto");
 
-// Create Razorpay Order
+const mapCourse = (c) => {
+  if (!c) return null;
+  return {
+    ...c,
+    _id: c.id,
+    creator: c.creator ? { ...c.creator, _id: c.creator.id } : null,
+    lectures: c.lectures ? c.lectures.map(l => ({ ...l, _id: l.id })) : []
+  };
+};
+
 const createRazorpayOrder = async (req, res) => {
   try {
-    const userId = req.tokenId;
+    const userId = req.userId;
     const { courseId } = req.body;
 
-    // Fetch the course details
-    const course = await Course.findById(courseId);
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) {
       return res.status(404).json({
         message: "Course not found",
         success: false,
       });
     }
+    if (!course.isPublished || !Number.isFinite(course.coursePrice) || course.coursePrice < 0) {
+      return res.status(400).json({
+        message: "This course is not currently available for purchase",
+        success: false,
+      });
+    }
 
-    // Create the purchase record in the database
-    const newPurchase = new CoursePurchase({
-      courseId,
-      userId,
-      amount: course.coursePrice,
-      status: "pending",
+    const completedPurchase = await prisma.coursePurchase.findFirst({
+      where: {
+        courseId,
+        userId,
+        status: "completed",
+      }
     });
+    if (completedPurchase) {
+      return res.status(409).json({
+        message: "You already own this course",
+        success: false,
+      });
+    }
 
-    // ✅ FIXED: Shorter receipt ID (under 40 characters)
     const receiptId = `rcpt${Date.now()}`;
 
-    // Create Razorpay Order
     const options = {
-      amount: course.coursePrice * 100, // Amount in paise
+      amount: Math.round(course.coursePrice * 100),
       currency: "INR",
-      receipt: receiptId, // ✅ Now under 40 characters
+      receipt: receiptId,
       notes: {
         courseId: courseId,
         userId: userId,
@@ -46,11 +60,16 @@ const createRazorpayOrder = async (req, res) => {
 
     const order = await razorpay.orders.create(options);
 
-    // Save the purchase record with Razorpay order ID
-    newPurchase.paymentId = order.id;
-    await newPurchase.save();
+    await prisma.coursePurchase.create({
+      data: {
+        courseId,
+        userId,
+        amount: course.coursePrice,
+        status: "pending",
+        orderId: order.id,
+      }
+    });
 
-    // Respond with Razorpay order details
     return res.status(200).json({
       success: true,
       order: {
@@ -71,7 +90,6 @@ const createRazorpayOrder = async (req, res) => {
   }
 };
 
-// Verify Razorpay Payment
 const verifyRazorpayPayment = async (req, res) => {
   try {
     const {
@@ -80,24 +98,30 @@ const verifyRazorpayPayment = async (req, res) => {
       razorpay_signature,
       courseId,
     } = req.body;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    // Verify payment signature
-    const crypto = require("crypto");
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + "|" + razorpay_payment_id)
       .digest("hex");
 
-    if (expectedSignature === razorpay_signature) {
-      // Payment successful
+    const expectedBuffer = Buffer.from(expectedSignature);
+    const providedBuffer = Buffer.from(razorpay_signature || "");
+    const signatureIsValid =
+      expectedBuffer.length === providedBuffer.length &&
+      crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 
-      // Find and update purchase record
-      const purchase = await CoursePurchase.findOne({
-        paymentId: razorpay_order_id,
-        userId: userId,
-        courseId: courseId,
-      }).populate({ path: "courseId" });
+    if (signatureIsValid) {
+      const purchase = await prisma.coursePurchase.findFirst({
+        where: {
+          OR: [
+            { orderId: razorpay_order_id },
+            { paymentId: razorpay_order_id },
+          ],
+          userId,
+          courseId,
+        }
+      });
 
       if (!purchase) {
         return res.status(404).json({
@@ -106,32 +130,23 @@ const verifyRazorpayPayment = async (req, res) => {
         });
       }
 
-      // Update purchase details
-      purchase.status = "completed";
-      purchase.paymentId = razorpay_payment_id; // Store final payment ID
-      await purchase.save();
-
-      // Make all lectures visible by setting `isPreviewFree` to true
-      if (purchase.courseId && purchase.courseId.lectures.length > 0) {
-        await Lecture.updateMany(
-          { _id: { $in: purchase.courseId.lectures } },
-          { $set: { isPreviewFree: true } }
-        );
-      }
-
-      // Update user's enrolledCourses
-      await User.findByIdAndUpdate(
-        userId,
-        { $addToSet: { enrolledCourses: purchase.courseId._id } },
-        { new: true }
-      );
-
-      // Update course to add user ID to enrolledStudents
-      await Course.findByIdAndUpdate(
-        purchase.courseId._id,
-        { $addToSet: { enrolledStudents: userId } },
-        { new: true }
-      );
+      await prisma.$transaction([
+        prisma.coursePurchase.update({
+          where: { id: purchase.id },
+          data: {
+            status: "completed",
+            paymentId: razorpay_payment_id
+          }
+        }),
+        prisma.user.update({
+          where: { id: userId },
+          data: {
+            enrolledCourses: {
+              connect: { id: courseId }
+            }
+          }
+        })
+      ]);
 
       return res.status(200).json({
         success: true,
@@ -139,14 +154,22 @@ const verifyRazorpayPayment = async (req, res) => {
         paymentId: razorpay_payment_id,
       });
     } else {
-      // Payment verification failed
-      const purchase = await CoursePurchase.findOne({
-        paymentId: razorpay_order_id,
+      const purchase = await prisma.coursePurchase.findFirst({
+        where: {
+          OR: [
+            { orderId: razorpay_order_id },
+            { paymentId: razorpay_order_id },
+          ],
+          userId,
+          courseId,
+        }
       });
 
       if (purchase) {
-        purchase.status = "failed";
-        await purchase.save();
+        await prisma.coursePurchase.update({
+          where: { id: purchase.id },
+          data: { status: "failed" }
+        });
       }
 
       return res.status(400).json({
@@ -164,47 +187,51 @@ const verifyRazorpayPayment = async (req, res) => {
   }
 };
 
-// Get Course Details
 const getCourseDetail = async (req, res) => {
   try {
-    console.log("Received request to fetch course details");
-
     const { courseId } = req.params;
-    const userId = req.tokenId;
+    const userId = req.userId;
 
-    console.log(
-      `Fetching course details for courseId: ${courseId} and userId: ${userId}`
-    );
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        creator: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        },
+        lectures: true
+      }
+    });
 
-    // Fetch course details with creator and lectures populated
-    const course = await Course.findById(courseId)
-      .populate({
-        path: "creator",
-      })
-      .populate({
-        path: "lectures",
-      });
-
-    console.log("Course fetched:", course);
-
-    // Fetch purchase details
-    const purchase = await coursePurchased.findOne({ userId, courseId });
-    console.log("Purchase details:", purchase);
-
-    // If course is not found, return 404
-    if (!course) {
-      console.log("Course not found");
+    if (!course || !course.isPublished) {
       return res.status(404).json({
-        message: "course not found",
+        message: "Course not found",
         success: false,
       });
     }
 
-    // Return course details along with purchase status
-    console.log("Sending course details response");
+    const purchase = await prisma.coursePurchase.findFirst({
+      where: {
+        userId,
+        courseId,
+        status: "completed",
+      }
+    });
+    const purchased = Boolean(purchase);
+    const safeCourse = mapCourse(course);
+
+    if (!purchased) {
+      safeCourse.lectures = safeCourse.lectures.map((lecture) => {
+        if (lecture.isPreviewFree) {
+          return lecture;
+        }
+        const { videoUrl, publicId, ...safeLecture } = lecture;
+        return safeLecture;
+      });
+    }
+
     return res.status(200).json({
-      course,
-      purchased: !!purchase, // Convert to boolean
+      course: safeCourse,
+      purchased,
     });
   } catch (error) {
     console.error("Error fetching course details:", error);
@@ -215,66 +242,92 @@ const getCourseDetail = async (req, res) => {
   }
 };
 
-// Get All Purchased Courses
 const getAllPurchaseCourse = async (req, res) => {
   try {
-    const purchaseCourse = await CoursePurchase.find({
-      status: "completed",
-    }).populate("courseId");
+    const purchases = await prisma.coursePurchase.findMany({
+      where: {
+        userId: req.userId,
+        status: "completed",
+      },
+      include: {
+        course: {
+          include: {
+            creator: {
+              select: { id: true, name: true, email: true, photoUrl: true }
+            }
+          }
+        }
+      }
+    });
 
-    if (!purchaseCourse) {
-      return res.status(404).json({
-        message: "Nothing purchased yet",
-        success: false,
-        purchaseCourse: [],
-      });
-    }
+    const mappedPurchases = purchases.map(p => ({
+      ...p,
+      _id: p.id,
+      courseId: p.course ? {
+        ...p.course,
+        _id: p.course.id,
+        creator: p.course.creator ? { ...p.course.creator, _id: p.course.creator.id } : null
+      } : null
+    }));
+
     return res.status(200).json({
       message: "found courses",
-      purchaseCourse,
+      purchaseCourse: mappedPurchases,
       success: true,
     });
   } catch (error) {
-    console.log(error);
+    console.error("Error fetching purchased courses:", error);
+    return res.status(500).json({
+      message: "Error fetching purchased courses",
+      success: false,
+    });
   }
 };
 
-// Get Admin Created and Purchased Courses
 const getAdminCreatedAndPurchasedCourses = async (req, res) => {
   try {
-    const adminId = req.tokenId;
+    const adminId = req.userId;
     console.log("Admin ID from token: ", adminId);
 
-    // First, get courses created by the admin
-    const adminCourses = await Course.find({ creator: adminId });
+    const adminCourses = await prisma.course.findMany({
+      where: { creatorId: adminId }
+    });
     console.log(`Found ${adminCourses.length} courses created by admin.`);
 
-    if (adminCourses.length === 0) {
-      console.log("No courses found for this admin.");
-    }
+    const adminCourseIds = adminCourses.map((course) => course.id);
 
-    // Get the courseIds of admin-created courses
-    const adminCourseIds = adminCourses.map((course) => course._id);
-    console.log("Admin course IDs: ", adminCourseIds);
+    const purchasedCourses = await prisma.coursePurchase.findMany({
+      where: {
+        courseId: { in: adminCourseIds },
+        status: "completed",
+      },
+      include: {
+        course: true,
+        user: {
+          select: { id: true, name: true, email: true, photoUrl: true }
+        }
+      }
+    });
 
-    // Then, find the purchases where the courseId is from admin-created courses
-    const purchasedCourses = await CoursePurchase.find({
-      courseId: { $in: adminCourseIds },
-      status: "completed",
-    })
-      .populate("courseId")
-      .populate("userId");
+    const mappedPurchased = purchasedCourses.map(p => ({
+      ...p,
+      _id: p.id,
+      courseId: p.course ? {
+        ...p.course,
+        _id: p.course.id
+      } : null,
+      userId: p.user ? {
+        ...p.user,
+        _id: p.user.id
+      } : null
+    }));
 
-    console.log(`Found ${purchasedCourses.length} purchased courses.`);
-
-    if (purchasedCourses.length === 0) {
-      console.log("No purchases found for admin-created courses.");
-    }
+    console.log(`Found ${mappedPurchased.length} purchased courses.`);
 
     return res.status(200).json({
       message: "found",
       success: true,
-      purchasedCourses,
+      purchasedCourses: mappedPurchased,
     });
   } catch (error) {
     console.error("Error fetching admin-created and purchased courses:", error);
