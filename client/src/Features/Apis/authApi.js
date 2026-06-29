@@ -1,6 +1,6 @@
 // client/src/Features/Apis/authApi.js
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { loginUser, logoutUser } from "../auth/authSlice.js";
+import { loginUser, logoutUser, updateUser as updateAuthUser } from "../auth/authSlice.js";
 import { createAuthenticatedBaseQuery } from "./baseQuery.js";
 
 export const authApi = createApi({
@@ -57,6 +57,16 @@ export const authApi = createApi({
         body: formData,
       }),
       invalidatesTags: ["User"],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data.success && data.updatedUser) {
+            dispatch(updateAuthUser(data.updatedUser));
+          }
+        } catch (error) {
+          console.error("Profile update failed:", error);
+        }
+      },
     }),
 
     logoutUser: builder.mutation({
