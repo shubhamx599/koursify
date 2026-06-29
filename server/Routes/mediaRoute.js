@@ -31,11 +31,8 @@ router.post("/uploadVideo", isAuthenticated, requireInstructor, upload.single("f
 
         console.log(`📁 File received: ${req.file.originalname} (${req.file.mimetype})`);
 
-        // Convert file buffer to base64 before uploading to Cloudinary
-        const fileBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-
         console.log("🚀 Uploading file to Cloudinary...");
-        const result = await uploadMedia(fileBase64); // Uploading buffer data
+        const result = await uploadMedia(req.file.buffer); // Uploading buffer data directly
 
         console.log("✅ Upload successful!");
         console.log("🌐 Cloudinary Response:", result);
