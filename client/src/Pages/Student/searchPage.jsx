@@ -24,7 +24,7 @@ const SearchPage = () => {
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         <Filter handleFilterChange={(categories, price) => { setSelectedCategories(categories); setSortByPrice(price); }}/>
         <div className="space-y-4">
-          {isLoading ? Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index}/>) :
+          {isLoading ? Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={index} variant="list"/>) :
             courses.length ? courses.map((course) => <SearchResult key={course._id} course={course}/>) :
             <div className="surface grid min-h-64 place-items-center rounded-[24px] text-[#7f948b]">No courses match those filters yet.</div>}
         </div>
