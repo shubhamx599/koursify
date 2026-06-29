@@ -80,6 +80,24 @@ export const authApi = createApi({
         dispatch(logoutUser());
       },
     }),
+
+    switchRole: builder.mutation({
+      query: () => ({
+        url: "switch-role",
+        method: "PUT",
+      }),
+      invalidatesTags: ["User"],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data.success && data.user) {
+            dispatch(updateAuthUser(data.user));
+          }
+        } catch (error) {
+          console.error("Role switch failed:", error);
+        }
+      },
+    }),
   }),
 });
 
@@ -89,4 +107,5 @@ export const {
   useGetUserQuery,
   useUpdateUserMutation,
   useLogoutUserMutation,
+  useSwitchRoleMutation,
 } = authApi;
