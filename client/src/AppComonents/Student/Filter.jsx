@@ -3,18 +3,63 @@ import { Label } from '../../components/ui/label.jsx';
 import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue, SelectGroup } from '@/components/ui/select';
 import React, { useState } from 'react';
 
-const categories = [
-  { id: "nextjs", label: "Next JS" },
-  { id: "data science", label: "Data Science" },
-  { id: "frontend development", label: "Frontend Development" },
-  { id: "fullstack development", label: "Fullstack Development" },
-  { id: "Mern Stack developer", label: "MERN Stack Development" },
-  { id: "backend development", label: "Backend Development" },
-  { id: "javascript", label: "Javascript" },
-  { id: "python", label: "Python" },
-  { id: "docker", label: "Docker" },
-  { id: "mongodb", label: "MongoDB" },
-  { id: "html", label: "HTML" },
+const categoryGroups = [
+  {
+    label: "Web Development",
+    items: [
+      { id: "html", label: "HTML" },
+      { id: "css", label: "CSS" },
+      { id: "javascript", label: "JavaScript" },
+      { id: "react", label: "React" },
+      { id: "vue.js", label: "Vue.js" },
+      { id: "next.js", label: "Next.js" },
+    ]
+  },
+  {
+    label: "Data & AI",
+    items: [
+      { id: "python", label: "Python" },
+      { id: "r", label: "R" },
+      { id: "sql", label: "SQL" },
+      { id: "machine learning", label: "Machine Learning" },
+      { id: "pandas", label: "Pandas" },
+    ]
+  },
+  {
+    label: "Backend",
+    items: [
+      { id: "node.js", label: "Node.js" },
+      { id: "django", label: "Django" },
+      { id: "spring boot", label: "Spring Boot" },
+      { id: "golang", label: "GoLang" },
+    ]
+  },
+  {
+    label: "Cloud",
+    items: [
+      { id: "aws", label: "AWS" },
+      { id: "azure", label: "Azure" },
+      { id: "google cloud", label: "Google Cloud" },
+      { id: "kubernetes", label: "Kubernetes" },
+    ]
+  },
+  {
+    label: "Security & Testing",
+    items: [
+      { id: "ethical hacking", label: "Ethical Hacking" },
+      { id: "penetration testing", label: "Penetration Testing" },
+      { id: "network security", label: "Network Security" },
+    ]
+  },
+  {
+    label: "Languages",
+    items: [
+      { id: "c", label: "C" },
+      { id: "c++", label: "C++" },
+      { id: "java", label: "Java" },
+      { id: "rust", label: "Rust" },
+    ]
+  }
 ];
 
 const Filter = ({ handleFilterChange }) => {
@@ -62,21 +107,32 @@ const Filter = ({ handleFilterChange }) => {
         </Select>
       </div>
 
-      <div className="space-y-3 border-t border-white/10 pt-5">
+      <div className="space-y-4 border-t border-white/10 pt-5">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#6f857c]">Categories</p>
-        {categories.map((category) => (
-          <div key={category.id} className="flex items-center space-x-2 my-2">
-            <Checkbox
-              className="space-y-2"
-              id={category.id}
-              checked={selectedCategories.includes(category.id)} // Set checked state
-              onCheckedChange={() => handleCategoryChange(category.id)}
-            />
-            <Label className="text-sm font-medium leading-none text-[#aabbb4]">
-              {category.label}
-            </Label>
-          </div>
-        ))}
+        <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
+          {categoryGroups.map((group) => (
+            <div key={group.label} className="space-y-1.5">
+              <h4 className="text-[10px] font-extrabold text-[#556c62] uppercase tracking-[.1em]">{group.label}</h4>
+              <div className="space-y-2 pl-0.5">
+                {group.items.map((category) => (
+                  <div key={category.id} className="flex items-center space-x-2.5">
+                    <Checkbox
+                      id={category.id}
+                      checked={selectedCategories.includes(category.id)}
+                      onCheckedChange={() => handleCategoryChange(category.id)}
+                    />
+                    <Label
+                      htmlFor={category.id}
+                      className="text-xs font-semibold leading-none text-[#aabbb4] cursor-pointer hover:text-[#f6f3de] transition-colors select-none"
+                    >
+                      {category.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   );
