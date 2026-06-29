@@ -35,10 +35,19 @@ app.use("/api/course", courseRouter);
 app.use("/api/media", mediaRouter);
 app.use("/api/purchase", paymentGatewayRouter);
 app.use("/api/progress", progressRoute);
-app.use(express.static(path.join(_dirname, "/client/dist")));
-app.get("*", (_, res) => {
-  res.sendFile(path.resolve(_dirname, "client", "dist", "index.html"));
-});
+// Serve static client assets only if they exist (for local development or monorepo builds)
+const fs = require("fs");
+const clientDistPath = path.resolve(_dirname, "..", "client", "dist");
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.resolve(clientDistPath, "index.html"));
+  });
+} else {
+  app.get("/", (req, res) => {
+    res.json({ status: "active", message: "Koursify API Backend is up and running!" });
+  });
+}
 const startServer = async () => {
   console.log("🔄 Attempting to connect to the database...");
   await connectToDb();
