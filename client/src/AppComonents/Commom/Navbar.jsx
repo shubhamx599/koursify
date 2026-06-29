@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ArrowUpRight, BookOpen, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { ArrowUpRight, BookOpen, LayoutDashboard, LogOut, RefreshCw, UserRound } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -12,15 +12,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useGetUserQuery, useLogoutUserMutation } from "@/Features/Apis/authApi";
+import { useGetUserQuery, useLogoutUserMutation, useSwitchRoleMutation } from "@/Features/Apis/authApi";
 
 const GlassNavbar = () => {
   const navigate = useNavigate();
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { data: profile } = useGetUserQuery(undefined, { skip: !isAuthenticated });
   const [logout, { data, isSuccess }] = useLogoutUserMutation();
+  const [switchRole, { isLoading: switching }] = useSwitchRoleMutation();
   const user = profile?.user;
   const initials = (user?.name || user?.email || "K").slice(0, 2).toUpperCase();
+
+  const handleSwitchRole = async () => {
+    try {
+      const response = await switchRole().unwrap();
+      toast.success(response.message);
+      if (response.user?.role === "student") {
+        navigate("/");
+      }
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to switch role");
+    }
+  };
 
   useEffect(() => {
     if (isSuccess) {
@@ -69,6 +82,10 @@ const GlassNavbar = () => {
               {user?.role === "instructor" && (
                 <DropdownMenuItem asChild><Link to="/admin/dashboard" className="gap-3 rounded-xl"><LayoutDashboard size={16}/>Instructor studio</Link></DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={handleSwitchRole} disabled={switching} className="gap-3 rounded-xl cursor-pointer text-[#c9ff62] focus:text-[#c9ff62] focus:bg-[#c9ff62]/10">
+                <RefreshCw size={16} className={switching ? "animate-spin" : ""} />
+                {user?.role === "instructor" ? "Switch to Student" : "Switch to Instructor"}
+              </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => logout()} className="gap-3 rounded-xl text-[#ff9b8f] focus:text-[#ff9b8f]"><LogOut size={16}/>Sign out</DropdownMenuItem>
             </DropdownMenuContent>

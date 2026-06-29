@@ -1,16 +1,31 @@
 import { useState } from "react";
-import { Camera, Loader2, Mail, Save, UserRound } from "lucide-react";
+import { Camera, Loader2, Mail, Save, UserRound, RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Course from "@/AppComonents/Student/course";
-import { useGetUserQuery, useUpdateUserMutation } from "@/Features/Apis/authApi";
+import { useGetUserQuery, useUpdateUserMutation, useSwitchRoleMutation } from "@/Features/Apis/authApi";
 
 const Profile = () => {
   const { data, isLoading, refetch } = useGetUserQuery();
   const [updateUser, { isLoading: saving }] = useUpdateUserMutation();
+  const [switchRole, { isLoading: switching }] = useSwitchRoleMutation();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [photo, setPhoto] = useState(null);
   const user = data?.user;
+
+  const handleSwitchRole = async () => {
+    try {
+      const response = await switchRole().unwrap();
+      toast.success(response.message);
+      if (response.user?.role === "student") {
+        navigate("/");
+      }
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to switch role");
+    }
+  };
 
   const save = async () => {
     const form = new FormData();
@@ -35,6 +50,16 @@ const Profile = () => {
           <div className="mt-7 space-y-3 border-t border-white/10 pt-6">
             <p className="flex items-center gap-3 text-sm text-[#9badb6]"><Mail size={16} className="text-[#c9ff62]"/>{user?.email}</p>
             <p className="flex items-center gap-3 text-sm text-[#9badb6]"><UserRound size={16} className="text-[#c9ff62]"/>{user?.enrolledCourses?.length || 0} enrolled courses</p>
+          </div>
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <button
+              onClick={handleSwitchRole}
+              disabled={switching}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#c9ff62]/20 bg-[#c9ff62]/5 py-2.5 text-xs font-bold text-[#c9ff62] hover:bg-[#c9ff62]/10 transition disabled:opacity-40 select-none cursor-pointer"
+            >
+              <RefreshCw size={14} className={switching ? "animate-spin" : ""} />
+              {user?.role === "instructor" ? "Switch to Student" : "Switch to Instructor"}
+            </button>
           </div>
         </aside>
         <div>
