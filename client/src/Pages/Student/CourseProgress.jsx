@@ -1,10 +1,11 @@
 import { useCompleteCourseMutation, useGetCourseProgressQuery, useInCompleteCourseMutation, useUpdateLectProgressMutation } from '@/Features/Apis/progressApi';
 import { CirclePlay, Loader2Icon, Sparkles } from 'lucide-react';
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const CourseProgress = () => {
     const { courseId } = useParams();
+    const navigate = useNavigate();
     const [currLect, setCurrLect] = useState(null);
     const { data, isLoading, isError, refetch } = useGetCourseProgressQuery(courseId);
 
@@ -29,6 +30,26 @@ const CourseProgress = () => {
 
     const { courseDetails, progress, completed } = data.data;
     const { courseTitle, lectures } = courseDetails;
+
+    if (!lectures || lectures.length === 0) {
+        return (
+            <div className="page-container grid min-h-[70vh] place-items-center text-center">
+                <div className="max-w-sm surface p-8 rounded-[28px]">
+                    <CirclePlay className="mx-auto text-[#5d726a] animate-pulse" size={48} />
+                    <h2 className="mt-5 text-xl font-bold text-[#f6f3de]">Curriculum is empty</h2>
+                    <p className="mt-2 text-sm text-[#70877e] leading-relaxed">
+                        The instructor hasn't uploaded any lessons for this course yet. Check back later!
+                    </p>
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="ghost-button mt-6 text-sm min-h-10 px-5"
+                    >
+                        Go back
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     // Get the current active lecture
     const activeLecture = currLect || lectures?.[0];
