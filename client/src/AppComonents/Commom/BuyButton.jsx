@@ -57,7 +57,7 @@ const BuyButton = ({ courseId, coursePrice, courseTitle }) => {
         key: key,
         amount: order.amount,
         currency: order.currency,
-        name: "Learnify", // Change to your platform name
+        name: "Koursify", // Change to your platform name
         description: courseTitle || `Course Purchase`,
         order_id: order.id,
         handler: async function (response) {
