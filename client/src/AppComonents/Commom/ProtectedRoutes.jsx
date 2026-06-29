@@ -3,8 +3,8 @@ import { useSelector } from "react-redux";
 import { Navigate, Outlet } from "react-router-dom";
 
 const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+  <div className="flex justify-center items-center h-screen bg-[#07110f]">
+    <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/5 border-t-[#c9ff62]"></div>
   </div>
 );
 
