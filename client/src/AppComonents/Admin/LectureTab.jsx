@@ -15,7 +15,6 @@ const LectureTab = () => {
     const [isFree, setIsFree] = useState(false);
     const [uploadMediaProgress, setUploadMediaProgress] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [buttonDisable, setButtonDisable] = useState(true);
 
     const { data: lectureData, refetch } = useGetLectureQuery(courseId);
     const apiRoot = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
@@ -36,7 +35,6 @@ const LectureTab = () => {
                         videoUrl: currentLecture.videoUrl,
                         publicId: currentLecture.publicId || ""
                     });
-                    setButtonDisable(false);
                 }
             }
         }
@@ -71,7 +69,6 @@ const LectureTab = () => {
                         videoUrl: result.data.data.secure_url,
                         publicId: result.data.data.public_id
                     });
-                    setButtonDisable(false);
                     toast.success("Video uploaded successfully", { className: "custom-toast" });
                 }
             } catch (e) {
@@ -198,7 +195,7 @@ const LectureTab = () => {
                 <div className="border-t border-white/10 pt-6 mt-6">
                     <button
                         onClick={btnClickHandler}
-                        disabled={buttonDisable || isLoading}
+                        disabled={isLoading || !lectureTitle.trim()}
                         className="lime-button min-h-11 px-6 text-sm flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={15} />}
