@@ -9,7 +9,7 @@ const SearchResult = ({ course }) => (
     <div className="flex min-w-0 flex-1 flex-col p-2 sm:py-3">
       <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#c9ff62]">{course.category || "Course"}</p><h3 className="mt-2 text-xl font-bold text-[#f6f3de]">{course.courseTitle}</h3></div><ArrowUpRight className="shrink-0 text-[#c9ff62]" size={19}/></div>
       <p className="mt-2 line-clamp-2 text-sm text-[#7f948b]">{course.subTitle}</p>
-      <div className="mt-auto flex items-end justify-between pt-4"><p className="text-xs text-[#82978f]">By {course.creator?.name || course.creator?.email?.split("@")[0]}</p><p className="text-xl font-extrabold text-[#f6f3de]">₹{course.coursePrice || 0}</p></div>
+      <div className="mt-auto flex items-end justify-between pt-4"><p className="text-xs text-[#82978f]">By {course.creator?.name || course.creator?.email?.split("@")[0] || "Koursify mentor"}</p><p className="text-xl font-extrabold text-[#f6f3de]">₹{course.coursePrice || 0}</p></div>
     </div>
   </Link>
 );
